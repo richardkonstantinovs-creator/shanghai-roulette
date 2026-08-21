@@ -88,6 +88,15 @@ html,body{
   /* CJK letterspacing adds a trailing gap; pull it back so it stays centred */
   text-indent:.18em;
 }
+/* Plenty of places have no Latin name at all, and then the Chinese *is* the
+   name and carries the display line — it is not repeated underneath. The
+   display stack is a Latin serif, so it has to switch to the CJK stack here
+   or the glyphs fall out of it onto whatever the device picks; and a title
+   wants far less tracking than the .18em of the secondary line. */
+.pname.cjk{
+  font-family:var(--cjk);font-weight:600;
+  letter-spacing:.04em;text-indent:.04em;line-height:1.14;
+}
 .pmeta{
   font-family:var(--utility);font-size:12px;font-weight:700;letter-spacing:.28em;
   text-transform:uppercase;color:var(--engrave);opacity:.7;margin-top:18px;
@@ -2327,8 +2336,10 @@ function showResult(i) {
   $("rerollno").textContent = spin.rerolls ? "  ·  RE-ROLL " + spin.rerolls : "";
 
   const latin = v.nameLatin || (hasCJK(v.name) ? null : v.name);
+  // no Latin name: the Chinese takes the display line and nothing repeats it
   $("pname").textContent = latin || v.name;
-  $("pzh").textContent = hasCJK(v.name) && v.name !== latin ? v.name : "";
+  $("pname").classList.toggle("cjk", !latin);
+  $("pzh").textContent = latin && hasCJK(v.name) && v.name !== latin ? v.name : "";
   $("pmeta").textContent = (CAT_LABEL.get(v.category) || v.category) + "  ·  " + (v.district || "");
 
   if (filters.pos) {
