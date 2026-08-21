@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>iPad check</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--ink:#0B1A2B;--engrave:#7FA9C4;--rubbing:#F0E2C8;--nova:#FFB03A;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--ink);color:var(--engrave);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:17px;line-height:1.8;
+  padding:40px 28px;-webkit-text-size-adjust:100%;}
+h1{font-family:ui-serif,"New York",Georgia,serif;font-size:34px;font-weight:600;
+  color:var(--rubbing);margin-bottom:6px;letter-spacing:-.01em;}
+.verdict{font-size:22px;margin:22px 0;padding:18px;border:3px solid var(--nova);color:var(--nova);}
+.row{display:flex;justify-content:space-between;gap:16px;
+  border-bottom:3px solid rgba(127,169,196,.14);padding:10px 0;}
+.row b{font-weight:700;color:var(--rubbing);}
+.ok{color:#9ad39a;} .bad{color:var(--nova);}
+canvas{display:block;margin-top:20px;border:3px solid rgba(127,169,196,.2);width:100%;height:90px;}
+small{display:block;margin-top:22px;opacity:.6;font-size:13px;line-height:1.6;word-break:break-word;}
+</style>
+</head>
+<body>
+
+<h1>Shanghai Roulette</h1>
+<div>проверка планшета</div>
+
+<!-- Static. If JavaScript runs, it is replaced. If it stays as written
+     below, this viewer does not execute scripts and the real app cannot
+     work here either. -->
+<div class="verdict" id="verdict">
+  СКРИПТЫ НЕ ВЫПОЛНЯЮТСЯ.<br>
+  Этот просмотрщик показывает файл, но не запускает его.
+</div>
+
+<div id="rows"></div>
+<canvas id="c" width="600" height="180"></canvas>
+<small id="ua"></small>
+
+<script>
+(function () {
+  var rows = document.getElementById("rows");
+  function line(name, value, good) {
+    var d = document.createElement("div");
+    d.className = "row";
+    d.innerHTML = "<b>" + name + "</b><span class='" + (good ? "ok" : "bad") + "'>" + value + "</span>";
+    rows.appendChild(d);
+  }
+
+  var v = document.getElementById("verdict");
+  v.style.borderColor = "#9ad39a";
+  v.style.color = "#9ad39a";
+  v.innerHTML = "СКРИПТЫ РАБОТАЮТ.<br>Здесь приложение запустится.";
+
+  // canvas 2d — the entire map is drawn with it
+  var canvasOk = false;
+  try {
+    var c = document.getElementById("c");
+    var g = c.getContext("2d");
+    g.fillStyle = "#06111C"; g.fillRect(0, 0, 600, 180);
+    g.globalCompositeOperation = "lighter";
+    for (var i = 0; i < 60; i++) {
+      var x = 20 + i * 9.5, y = 90 + Math.sin(i / 3) * 45;
+      var grd = g.createRadialGradient(x, y, 0, x, y, 22);
+      grd.addColorStop(0, "rgba(127,169,196,1)");
+      grd.addColorStop(1, "rgba(127,169,196,0)");
+      g.fillStyle = grd; g.fillRect(x - 22, y - 22, 44, 44);
+    }
+    canvasOk = g.getImageData(0, 0, 1, 1).data.length === 4;
+  } catch (e) { canvasOk = false; }
+  line("canvas — карта", canvasOk ? "да" : "НЕТ", canvasOk);
+
+  // localStorage — every rating is a real trip that cannot be redone
+  var lsOk = false, lsNote = "НЕТ";
+  try {
+    localStorage.setItem("sh.check", "1");
+    lsOk = localStorage.getItem("sh.check") === "1";
+    localStorage.removeItem("sh.check");
+    lsNote = lsOk ? "да" : "НЕТ";
+  } catch (e) { lsNote = "НЕТ — " + e.name; }
+  line("сохранение оценок", lsNote, lsOk);
+
+  // a rating written last time this file was opened
+  var seen = null;
+  try { seen = localStorage.getItem("sh.checkPersist"); localStorage.setItem("sh.checkPersist", new Date().toISOString()); } catch (e) {}
+  line("пережило прошлый запуск", seen ? "да — " + seen.slice(11, 19) : "первый запуск", !!seen);
+
+  var cryptoOk = false;
+  try { var a = new Uint32Array(1); crypto.getRandomValues(a); cryptoOk = true; } catch (e) {}
+  line("честный случайный выбор", cryptoOk ? "да" : "НЕТ (есть запасной)", cryptoOk);
+
+  line("экран", window.innerWidth + " × " + window.innerHeight + " @" + (window.devicePixelRatio || 1) + "x", true);
+  line("web audio", (window.AudioContext || window.webkitAudioContext) ? "да" : "НЕТ", !!(window.AudioContext || window.webkitAudioContext));
+  line("файлы (экспорт)", (typeof Blob !== "undefined" && typeof URL !== "undefined" && URL.createObjectURL) ? "да" : "НЕТ",
+       typeof Blob !== "undefined" && !!(URL && URL.createObjectURL));
+
+  var t0 = performance.now(), n = 0;
+  (function loop() {
+    n++;
+    if (performance.now() - t0 < 1500) requestAnimationFrame(loop);
+    else line("частота кадров", Math.round(n / ((performance.now() - t0) / 1000)) + " fps", n / 1.5 > 45);
+  })();
+
+  document.getElementById("ua").textContent = navigator.userAgent;
+})();
+</script>
+</body>
+</html>

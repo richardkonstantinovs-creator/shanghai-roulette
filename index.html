@@ -1,0 +1,3066 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Shanghai Roulette</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Рулетка">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="color-scheme" content="dark">
+<style>
+/* ------------------------------------------------------------------ tokens
+   Six colours and no seventh. DESIGN.md §2. */
+:root{
+  --ink:#0B1A2B;      /* base. never #000 — a black iPad mirrors the operator */
+  --abyss:#06111C;    /* water, road casing */
+  --engrave:#7FA9C4;  /* roads, constellation lines, unvisited stars */
+  --rubbing:#F0E2C8;  /* visited stars — ink rubbing on paper */
+  --nova:#FFB03A;     /* the winner, the rule frame, the 9:16 guide */
+  --sear:#FFF2D4;     /* nova core and spikes only. never text. */
+
+  --display: ui-serif, "New York", Georgia, serif;
+  --utility: ui-monospace, "SF Mono", Menlo, monospace;
+  --cjk: "PingFang SC", "Noto Sans CJK SC", sans-serif;
+
+  /* set from JS: width of the 9:16 crop, and the safe inset either side */
+  --crop: 100vw;
+  --gutter: 0px;
+
+  --pad-t: env(safe-area-inset-top, 0px);
+  --pad-b: env(safe-area-inset-bottom, 0px);
+  --pad-l: env(safe-area-inset-left, 0px);
+  --pad-r: env(safe-area-inset-right, 0px);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;}
+
+html,body{
+  height:100%;width:100%;overflow:hidden;
+  background:var(--ink);color:var(--engrave);
+  font-family:var(--utility);
+  font-variant-numeric:tabular-nums;
+  -webkit-user-select:none;user-select:none;
+  overscroll-behavior:none;
+}
+
+/* the map and everything that shakes with it */
+#stage{position:fixed;inset:0;will-change:transform;}
+#map{display:block;width:100%;height:100%;touch-action:none;}
+
+/* ------------------------------------------------------------- 9:16 guide */
+#guide{position:fixed;inset:0;pointer-events:none;display:none;z-index:6;}
+#guide.on{display:block;}
+#guide i{position:absolute;top:0;bottom:0;width:3px;background:var(--nova);opacity:.5;}
+#guide i.l{left:var(--gutter);} #guide i.r{right:var(--gutter);}
+
+/* ------------------------------------------------------------- the result
+   Sits inside the crop. No text shadow anywhere — the vignette and the
+   bloom do that job. DESIGN.md §10. */
+#result{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:var(--crop);max-width:var(--crop);
+  padding:0 26px;text-align:center;z-index:5;
+  pointer-events:none;opacity:0;
+}
+#result.on{opacity:1;}
+
+.ticket{
+  font-family:var(--utility);font-size:12px;font-weight:700;
+  letter-spacing:.42em;text-transform:uppercase;
+  color:var(--engrave);opacity:.75;margin-bottom:14px;
+}
+.reroll{color:var(--rubbing);opacity:.9;}  /* not amber: amber is spent on
+                                              the nova and the rule only */
+
+.pname{
+  font-family:var(--display);font-size:clamp(40px,5.6vw,66px);font-weight:600;
+  letter-spacing:-.015em;line-height:1.02;color:var(--rubbing);
+}
+.pzh{
+  font-family:var(--cjk);font-size:clamp(21px,2.5vw,30px);font-weight:600;
+  letter-spacing:.18em;color:var(--rubbing);opacity:.82;
+  margin-top:12px;
+  /* CJK letterspacing adds a trailing gap; pull it back so it stays centred */
+  text-indent:.18em;
+}
+.pmeta{
+  font-family:var(--utility);font-size:12px;font-weight:700;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--engrave);opacity:.7;margin-top:18px;
+}
+.pcoord{
+  font-family:var(--utility);font-size:clamp(15px,1.8vw,20px);font-weight:500;
+  letter-spacing:.1em;color:var(--engrave);margin-top:16px;
+}
+.pdist{
+  font-family:var(--utility);font-size:clamp(15px,1.8vw,20px);font-weight:500;
+  letter-spacing:.1em;color:var(--rubbing);opacity:.85;margin-top:8px;
+}
+
+/* the rule, in its amber frame — the second and last amber of the run */
+#rulebox{
+  margin:30px auto 0;max-width:100%;
+  border:3px solid var(--nova);
+  padding:20px 22px;
+  opacity:0;
+  overflow:hidden;
+}
+#rulebox.on{opacity:1;}
+#ruletext{
+  font-family:var(--display);font-size:clamp(25px,3.2vw,38px);font-weight:700;
+  letter-spacing:.01em;line-height:1.18;color:var(--nova);
+}
+#rulezh{
+  font-family:var(--cjk);font-size:clamp(17px,2vw,23px);font-weight:600;
+  letter-spacing:.14em;text-indent:.14em;color:var(--nova);opacity:.72;margin-top:10px;
+}
+
+/* masked wipe outward, not a fade — a fade is what a template does */
+.wipe{
+  -webkit-mask-image:linear-gradient(90deg,#000 0 0);
+  mask-image:linear-gradient(90deg,#000 0 0);
+}
+
+/* ------------------------------------------------------------- the prompt */
+#prompt{
+  position:fixed;left:50%;bottom:calc(14% + var(--pad-b));transform:translateX(-50%);
+  font-family:var(--utility);font-size:13px;font-weight:700;letter-spacing:.42em;
+  text-transform:uppercase;color:var(--engrave);opacity:.55;z-index:5;
+  pointer-events:none;text-align:center;
+}
+
+/* --------------------------------------------------------- corner controls
+   Everything tappable lives in a corner, because the corners fall outside
+   the 9:16 crop. Nothing tappable in the centre except the spin itself. */
+.corner{position:fixed;z-index:7;display:flex;gap:8px;align-items:center;}
+.corner.tl{top:calc(12px + var(--pad-t));left:calc(12px + var(--pad-l));}
+.corner.tr{top:calc(12px + var(--pad-t));right:calc(12px + var(--pad-r));}
+.corner.bl{bottom:calc(12px + var(--pad-b));left:calc(12px + var(--pad-l));}
+.corner.br{bottom:calc(12px + var(--pad-b));right:calc(12px + var(--pad-r));}
+body.hideui .corner,body.hideui #prompt{display:none;}
+
+.btn{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--engrave);
+  background:rgba(6,17,28,.72);
+  border:3px solid rgba(127,169,196,.22);
+  padding:12px 14px;min-height:44px;min-width:44px; /* thumb target */
+  cursor:pointer;
+}
+.btn:active{border-color:rgba(127,169,196,.5);}
+.btn.on{color:var(--nova);border-color:rgba(255,176,58,.55);}
+.btn.warm{color:var(--rubbing);}
+.btn.wide{width:100%;}
+.btn[disabled]{opacity:.32;}
+
+/* the live clock — a filmed spin has to carry a visible timestamp */
+#clock{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.2em;
+  color:var(--engrave);opacity:.6;padding:12px 4px;
+}
+
+/* ---------------------------------------------------------------- screens
+   A, C and D are never filmed, so they are allowed to be dense. */
+.screen{
+  position:fixed;inset:0;z-index:20;display:none;
+  background:var(--ink);
+  padding:calc(20px + var(--pad-t)) calc(22px + var(--pad-r)) calc(20px + var(--pad-b)) calc(22px + var(--pad-l));
+  overflow:hidden;
+  flex-direction:column;
+}
+.screen.on{display:flex;}
+.screen.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;}
+
+.htitle{
+  font-family:var(--display);font-size:30px;font-weight:600;letter-spacing:-.01em;
+  color:var(--rubbing);
+}
+.hsub{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.32em;
+  text-transform:uppercase;color:var(--engrave);opacity:.6;margin-top:6px;
+}
+.hrow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex:0 0 auto;}
+
+.section{margin-top:22px;flex:0 0 auto;}
+.slabel{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.32em;
+  text-transform:uppercase;color:var(--engrave);opacity:.6;margin-bottom:10px;
+}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{
+  font-family:var(--utility);font-size:12px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--engrave);
+  background:transparent;border:3px solid rgba(127,169,196,.2);
+  padding:11px 13px;min-height:44px;cursor:pointer;
+}
+.chip.on{color:var(--rubbing);border-color:rgba(240,226,200,.55);background:rgba(240,226,200,.06);}
+.chip .n{opacity:.45;margin-left:8px;font-weight:500;}
+
+/* the count, and the spin button that it disables */
+#countline{
+  font-family:var(--display);font-size:clamp(28px,4vw,44px);font-weight:600;
+  color:var(--rubbing);letter-spacing:-.01em;
+}
+#countline.zero{color:var(--nova);}
+#counthint{font-family:var(--utility);font-size:12px;letter-spacing:.18em;
+  text-transform:uppercase;opacity:.55;margin-top:8px;}
+
+.spacer{flex:1 1 auto;min-height:12px;}
+.footrow{display:flex;gap:10px;flex:0 0 auto;padding-top:18px;}
+.footrow .btn{flex:1 1 auto;text-align:center;padding:18px 14px;font-size:13px;}
+.btn.primary{color:var(--nova);border-color:var(--nova);}
+
+/* ---------------------------------------------------------- rating scale */
+.scale{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;}
+.scale b{
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--utility);font-size:17px;font-weight:700;
+  min-height:56px;color:var(--engrave);
+  border:3px solid rgba(127,169,196,.2);cursor:pointer;
+}
+.scale b.on{color:var(--ink);background:var(--rubbing);border-color:var(--rubbing);}
+.scale b.zero.on{color:var(--ink);background:var(--engrave);border-color:var(--engrave);}
+.nerve{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.nerve b{
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--utility);font-size:15px;font-weight:700;letter-spacing:.1em;
+  min-height:56px;color:var(--engrave);
+  border:3px solid rgba(127,169,196,.2);cursor:pointer;text-align:center;
+}
+.nerve b.on{color:var(--ink);background:var(--rubbing);border-color:var(--rubbing);}
+
+.field{
+  font-family:var(--utility);font-size:20px;font-weight:600;letter-spacing:.06em;
+  color:var(--rubbing);background:rgba(6,17,28,.6);
+  border:3px solid rgba(127,169,196,.2);
+  padding:15px;width:100%;min-height:54px;
+}
+.field::placeholder{color:var(--engrave);opacity:.4;}
+.field:focus{outline:none;border-color:rgba(240,226,200,.5);}
+select.field{-webkit-appearance:none;appearance:none;}
+select.field option{background:var(--ink);color:var(--rubbing);}
+
+/* ------------------------------------------------------------- archive */
+#arclist{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-top:14px;}
+.arcitem{
+  display:flex;align-items:baseline;gap:14px;
+  padding:15px 4px;border-bottom:3px solid rgba(127,169,196,.1);cursor:pointer;
+}
+.arcitem .no{font-family:var(--utility);font-size:11px;letter-spacing:.2em;opacity:.45;
+  flex:0 0 auto;width:56px;}
+.arcitem .nm{font-family:var(--display);font-size:21px;color:var(--rubbing);flex:1 1 auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.arcitem .nm .zh{font-family:var(--cjk);font-size:16px;opacity:.6;margin-left:10px;}
+.arcitem .st{font-family:var(--utility);font-size:15px;color:var(--nova);flex:0 0 auto;}
+.arcitem .st.skip{color:var(--engrave);opacity:.5;}
+
+.empty{
+  font-family:var(--display);font-size:22px;color:var(--engrave);opacity:.55;
+  text-align:center;padding:60px 20px;line-height:1.5;
+}
+
+/* --------------------------------------------------------------- dialog */
+#dialog{
+  position:fixed;inset:0;z-index:40;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(6,17,28,.86);padding:24px;
+}
+#dialog.on{display:flex;}
+#dialog .box{
+  max-width:520px;width:100%;background:var(--ink);
+  border:3px solid rgba(127,169,196,.3);padding:26px;
+}
+#dialog .box.warn{border-color:var(--nova);}
+#dtitle{font-family:var(--display);font-size:26px;color:var(--rubbing);line-height:1.25;}
+#dbody{font-family:var(--utility);font-size:14px;line-height:1.7;opacity:.75;margin-top:14px;
+  letter-spacing:.04em;}
+#dbtns{display:flex;gap:10px;margin-top:24px;}
+#dbtns .btn{flex:1 1 auto;text-align:center;padding:17px;font-size:13px;}
+
+.help{font-family:var(--utility);font-size:13px;line-height:1.85;opacity:.7;letter-spacing:.03em;}
+.help b{color:var(--rubbing);font-weight:700;}
+.help hr{border:none;border-top:3px solid rgba(127,169,196,.14);margin:16px 0;}
+
+/* toast — used for export confirmations, never for anything filmed */
+#toast{
+  position:fixed;left:50%;bottom:calc(28px + var(--pad-b));transform:translateX(-50%);
+  z-index:50;background:var(--ink);border:3px solid rgba(240,226,200,.4);
+  color:var(--rubbing);font-family:var(--utility);font-size:12px;font-weight:700;
+  letter-spacing:.18em;text-transform:uppercase;padding:14px 18px;
+  display:none;max-width:90vw;text-align:center;
+}
+#toast.on{display:block;}
+
+#nojs{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;padding:40px;text-align:center;
+  background:var(--ink);color:var(--engrave);
+  font-family:var(--utility);font-size:15px;line-height:1.7;letter-spacing:.06em;
+}
+#nojs b{
+  font-family:var(--display);font-size:30px;font-weight:600;
+  color:var(--rubbing);letter-spacing:-.01em;
+}
+#nojs span{color:var(--nova);font-size:13px;word-break:break-word;max-width:90vw;}
+
+#outro{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-family:var(--utility);font-size:clamp(28px,4.4vw,52px);font-weight:700;
+  letter-spacing:.34em;text-indent:.34em;color:var(--rubbing);
+  z-index:5;pointer-events:none;display:none;
+}
+#outro.on{display:block;}
+
+/* "Hide UI" removes every control except the spin target. One barely-there
+   button survives, in a corner outside the crop, or there is no way back. */
+body.hideui .corner{display:none;}
+body.hideui .corner.bl{display:flex;}
+body.hideui .corner.bl #bGuide{display:none;}
+body.hideui #bHide{
+  opacity:.12;border-color:transparent;background:transparent;
+}
+body.hideui #outro.on{display:block;}
+
+/* Nothing under 200ms, nothing under 3px, no flicker. DESIGN.md §9. */
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- Present in the markup, removed by init(). If it is still on screen the
+     page is being rendered by something that does not run JavaScript — the
+     Files preview on iPadOS does exactly that, and the result is a dead
+     screen that looks like a broken app. -->
+<div id="nojs">
+  <b>Скрипты не выполняются</b>
+  Этот просмотрщик показывает файл, но не запускает его.
+  Открой его в Safari.
+  <span id="nojserr"></span>
+</div>
+
+<script>
+// Installed before anything else, so a failure in the main script has
+// somewhere to report to. There is no console on an iPad.
+window.addEventListener("error", function (e) {
+  var box = document.getElementById("nojserr");
+  var head = document.querySelector("#nojs b");
+  if (!box || !head) return;
+  head.textContent = "Ошибка при запуске";
+  box.textContent = (e.message || "unknown") + "  ·  строка " + (e.lineno || "?");
+  var n = document.getElementById("nojs");
+  if (n) n.style.display = "flex";
+});
+</script>
+
+<!-- everything that shakes with the nova lives inside #stage -->
+<div id="stage">
+  <canvas id="map"></canvas>
+</div>
+
+<div id="guide"><i class="l"></i><i class="r"></i></div>
+
+<!-- the result. all of it sits inside the 9:16 crop. -->
+<div id="result">
+  <div class="ticket"><span id="ticketno">PLACE 001</span><span id="rerollno" class="reroll"></span></div>
+  <div class="pname" id="pname"></div>
+  <div class="pzh" id="pzh"></div>
+  <div class="pmeta" id="pmeta"></div>
+  <div class="pcoord" id="pcoord"></div>
+  <div class="pdist" id="pdist"></div>
+  <div id="rulebox"><div id="ruletext"></div><div id="rulezh"></div></div>
+</div>
+
+<div id="prompt">коснись, чтобы крутить</div>
+
+<!-- the outro: the sky pulls back and the catalogue says how far it has got -->
+<div id="outro"></div>
+
+<!-- controls, all four in the corners, all outside the crop -->
+<div class="corner tl">
+  <button class="btn" id="bSetup">фильтр</button>
+  <button class="btn" id="bArchive">архив</button>
+</div>
+<div class="corner tr">
+  <span id="clock">--:--:--</span>
+  <button class="btn" id="bHelp">?</button>
+</div>
+<div class="corner bl">
+  <button class="btn" id="bGuide">9:16</button>
+  <button class="btn" id="bHide">скрыть</button>
+</div>
+<div class="corner br">
+  <button class="btn" id="bOutro">финал</button>
+  <button class="btn warm" id="bRate">оценить</button>
+</div>
+
+<!-- ------------------------------------------------------ A — setup ---- -->
+<div class="screen" id="screenA">
+  <div class="hrow">
+    <div>
+      <div class="htitle">Шанхайская рулетка</div>
+      <div class="hsub" id="asub">фильтр</div>
+    </div>
+    <button class="btn" id="aClose">карта</button>
+  </div>
+
+  <div class="section">
+    <div class="slabel">радиус</div>
+    <div class="chips" id="radiusChips"></div>
+    <div class="chips" style="margin-top:8px">
+      <button class="chip" id="bPickHere">я здесь — отметить на карте</button>
+      <button class="chip" id="bGps">gps</button>
+    </div>
+    <div class="hsub" id="posInfo" style="margin-top:10px">позиция не задана</div>
+  </div>
+
+  <div class="section">
+    <div class="slabel">категории <span id="catAll" class="chip" style="padding:4px 8px;min-height:0">все</span></div>
+    <div class="chips" id="catChips"></div>
+  </div>
+
+  <div class="section">
+    <div class="slabel">районы <span id="distAll" class="chip" style="padding:4px 8px;min-height:0">все</span></div>
+    <div class="chips" id="distChips"></div>
+  </div>
+
+  <div class="spacer"></div>
+  <div style="flex:0 0 auto">
+    <div id="countline">—</div>
+    <div id="counthint">мест подходит</div>
+  </div>
+  <div class="footrow">
+    <button class="btn primary" id="aSpin">на карту</button>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------ C — rating --- -->
+<div class="screen" id="screenC">
+  <div class="hrow">
+    <div>
+      <div class="htitle" id="cName"></div>
+      <div class="hsub" id="cMeta"></div>
+    </div>
+    <button class="btn" id="cClose">назад</button>
+  </div>
+
+  <div class="section">
+    <div class="slabel">остановок метро <span style="opacity:.5">— 0 значит «мимо»</span></div>
+    <div class="scale" id="stopsScale"></div>
+    <div class="chips" style="margin-top:8px">
+      <button class="chip" id="cAirport">стоит поездки из аэропорта</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="slabel">цена на человека, ¥</div>
+    <input class="field" id="cPrice" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0">
+  </div>
+
+  <div class="section">
+    <div class="slabel">нерв — язык, странность, порог</div>
+    <div class="nerve" id="nerveScale"></div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="footrow">
+    <button class="btn" id="cDelete">удалить</button>
+    <button class="btn primary" id="cSave">сохранить</button>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------ D — archive -- -->
+<div class="screen" id="screenD">
+  <div class="hrow">
+    <div>
+      <div class="htitle">Каталог</div>
+      <div class="hsub" id="dCount">0 мест</div>
+    </div>
+    <button class="btn" id="dClose">карта</button>
+  </div>
+  <div class="section" style="margin-top:14px">
+    <input class="field" id="dSearch" type="search" placeholder="поиск по названию">
+  </div>
+  <div id="arclist"></div>
+  <div class="footrow">
+    <button class="btn" id="dAdd">добавить</button>
+    <button class="btn" id="dJson">.json</button>
+    <button class="btn" id="dCsv">.csv</button>
+    <button class="btn" id="dImport">импорт</button>
+  </div>
+  <input type="file" id="dFile" accept="application/json,.json" style="display:none">
+</div>
+
+<!-- ------------------------------------------- M — manual place entry -- -->
+<div class="screen scroll" id="screenM">
+  <div class="hrow">
+    <div>
+      <div class="htitle">Своё место</div>
+      <div class="hsub">которого нет в osm</div>
+    </div>
+    <button class="btn" id="mClose">назад</button>
+  </div>
+  <div class="section">
+    <div class="slabel">название</div>
+    <input class="field" id="mName" type="text" placeholder="Lao Chen Noodles">
+  </div>
+  <div class="section">
+    <div class="slabel">по-китайски</div>
+    <input class="field" id="mZh" type="text" placeholder="老陈面馆">
+  </div>
+  <div class="section">
+    <div class="slabel">категория</div>
+    <select class="field" id="mCat"></select>
+  </div>
+  <div class="section">
+    <div class="slabel">район</div>
+    <select class="field" id="mDist"></select>
+  </div>
+  <div class="section">
+    <div class="slabel">位置 — точка на карте</div>
+    <button class="btn wide" id="mPick">отметить на карте</button>
+    <div class="hsub" id="mPos" style="margin-top:10px">не задана</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="footrow">
+    <button class="btn primary" id="mSave">сохранить</button>
+  </div>
+</div>
+
+<div id="dialog"><div class="box" id="dbox">
+  <div id="dtitle"></div>
+  <div id="dbody"></div>
+  <div id="dbtns"></div>
+</div></div>
+
+<div id="toast"></div>
+
+<!-- Plain script src, not fetch and not a module: both are blocked by
+     Safari's origin rules under file://. See BUILD-DATA.md. -->
+<script src="data/shanghai.js"></script>
+<script>
+"use strict";
+
+/* ============================================================== bootstrap */
+
+const D = window.SH_DATA;
+const $ = (id) => document.getElementById(id);
+
+if (!D || !D.venues) {
+  document.body.innerHTML =
+    '<div class="empty" style="padding-top:30vh">data/shanghai.js не загрузился.<br>' +
+    'Оба файла — index.html и папка data — должны лежать рядом.</div>';
+  throw new Error("SH_DATA missing");
+}
+
+/* ------------------------------------------------------- safe storage
+   localStorage throws in private browsing. Degrade to memory rather than
+   crash, and tell the user once — ratings are real trips that cannot be
+   redone. CLAUDE.md, hard constraint 7. */
+const store = (() => {
+  const mem = Object.create(null);
+  let live = true;
+  try {
+    localStorage.setItem("sh.probe", "1");
+    localStorage.removeItem("sh.probe");
+  } catch (e) {
+    live = false;
+  }
+  return {
+    live,
+    get(key, fallback) {
+      try {
+        const raw = live ? localStorage.getItem(key) : mem[key];
+        return raw == null ? fallback : JSON.parse(raw);
+      } catch (e) {
+        return fallback;
+      }
+    },
+    set(key, value) {
+      let raw;
+      try {
+        raw = JSON.stringify(value);
+      } catch (e) {
+        return false;
+      }
+      mem[key] = raw;
+      if (!live) return false;
+      try {
+        localStorage.setItem(key, raw);
+        return true;
+      } catch (e) {
+        live = false; // quota or private mode — keep going from memory
+        return false;
+      }
+    },
+  };
+})();
+
+const SCHEMA_VERSION = 1;
+store.set("sh.version", SCHEMA_VERSION);
+
+/* ------------------------------------------------------------ geo maths */
+
+const R_EARTH = 6371.0088;
+const rad = (d) => (d * Math.PI) / 180;
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const dLat = rad(lat2 - lat1);
+  const dLng = rad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R_EARTH * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/* WGS-84 -> GCJ-02. OSM is WGS-84; every Chinese consumer map is GCJ-02 and
+   sits 300-600 m away in Shanghai. Any coordinate the user copies out to
+   navigate with has to be converted, and labelled. CLAUDE.md, known traps. */
+const GCJ_A = 6378245.0;
+const GCJ_EE = 0.00669342162296594323;
+
+function transformLat(x, y) {
+  let ret = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+  ret += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+  ret += ((20 * Math.sin(y * Math.PI) + 40 * Math.sin((y / 3) * Math.PI)) * 2) / 3;
+  ret += ((160 * Math.sin((y / 12) * Math.PI) + 320 * Math.sin((y * Math.PI) / 30)) * 2) / 3;
+  return ret;
+}
+function transformLng(x, y) {
+  let ret = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+  ret += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+  ret += ((20 * Math.sin(x * Math.PI) + 40 * Math.sin((x / 3) * Math.PI)) * 2) / 3;
+  ret += ((150 * Math.sin((x / 12) * Math.PI) + 300 * Math.sin((x / 30) * Math.PI)) * 2) / 3;
+  return ret;
+}
+function wgsToGcj(lat, lng) {
+  const dLat0 = transformLat(lng - 105, lat - 35);
+  const dLng0 = transformLng(lng - 105, lat - 35);
+  const radLat = rad(lat);
+  let magic = Math.sin(radLat);
+  magic = 1 - GCJ_EE * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  const dLat = (dLat0 * 180) / (((GCJ_A * (1 - GCJ_EE)) / (magic * sqrtMagic)) * Math.PI);
+  const dLng = (dLng0 * 180) / ((GCJ_A / sqrtMagic) * Math.cos(radLat) * Math.PI);
+  return [lat + dLat, lng + dLng];
+}
+
+/* Shanghai metro stops average roughly 1.2 km apart. This is the unit the
+   whole guide site is denominated in, so it lives in one place. */
+const KM_PER_STOP = 1.2;
+const stopsForKm = (km) => Math.max(1, Math.round(km / KM_PER_STOP));
+
+/* ------------------------------------------------- world projection
+   Equirectangular, metres-faithful enough across one city. y grows down. */
+const BBOX = D.bbox;
+const LAT0 = (BBOX[0] + BBOX[2]) / 2;
+const LNG0 = (BBOX[1] + BBOX[3]) / 2;
+const KX = Math.cos(rad(LAT0));
+const WX = (lng) => (lng - LNG0) * KX;
+const WY = (lat) => -(lat - LAT0);
+const INV_LAT = (y) => -y + LAT0;
+const INV_LNG = (x) => x / KX + LNG0;
+
+/* ------------------------------------------------------- line unpacking
+   Delta-encoded integers -> one flat Float32Array per layer, with an offset
+   table and a bbox table. One big buffer instead of 80 000 small objects:
+   the small-object version costs about 20 MB of overhead and stalls the GC
+   in the middle of the extinction. */
+function packLines(encoded) {
+  let total = 0;
+  for (const line of encoded) total += line.length;
+  const xy = new Float32Array(total);
+  const off = new Int32Array(encoded.length + 1);
+  const box = new Float32Array(encoded.length * 4);
+  let w = 0;
+  for (let i = 0; i < encoded.length; i++) {
+    const line = encoded[i];
+    off[i] = w >> 1;
+    let lat = line[0];
+    let lng = line[1];
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (let j = 0; j < line.length; j += 2) {
+      if (j > 0) {
+        lat += line[j];
+        lng += line[j + 1];
+      }
+      const x = WX(lng / 1e5);
+      const y = WY(lat / 1e5);
+      xy[w++] = x;
+      xy[w++] = y;
+      if (x < minx) minx = x;
+      if (x > maxx) maxx = x;
+      if (y < miny) miny = y;
+      if (y > maxy) maxy = y;
+    }
+    box[i * 4] = minx;
+    box[i * 4 + 1] = miny;
+    box[i * 4 + 2] = maxx;
+    box[i * 4 + 3] = maxy;
+  }
+  off[encoded.length] = w >> 1;
+  return { xy, off, box, count: encoded.length };
+}
+
+const G = {
+  water: packLines(D.water || []),
+  green: packLines(D.green || []),
+  w1: packLines((D.roads && D.roads.w1) || []),
+  w2: packLines((D.roads && D.roads.w2) || []),
+  w3: packLines((D.roads && D.roads.w3) || []),
+};
+const ROAD_NAMES = D.roadNames || [];
+const ROAD_NAME_IDX = D.roadNameIdx || { n1: [], n2: [] };
+
+/* ---------------------------------------------------------------- venues
+   Columns, not objects. 4 000 - 20 000 of these get touched every frame. */
+const VS = D.venueSchema;
+const CI = { id: VS.indexOf("id"), name: VS.indexOf("name"), latin: VS.indexOf("nameLatin"),
+  cat: VS.indexOf("category"), dist: VS.indexOf("district"),
+  lat: VS.indexOf("lat"), lng: VS.indexOf("lng") };
+
+const CATEGORIES = (D.categories || []).map((c) => (typeof c === "string" ? { id: c, ru: c, en: c } : c));
+const DISTRICTS = (D.districts || []).map((d) => (typeof d === "string" ? { name: d } : d));
+const CAT_LABEL = new Map(CATEGORIES.map((c) => [c.id, c.ru || c.en || c.id]));
+
+const V = {
+  n: 0,
+  id: [], name: [], latin: [], cat: [], dist: [], src: [],
+  lat: null, lng: null, x: null, y: null,
+};
+
+function buildVenueTable(manual) {
+  const rows = D.venues;
+  const n = rows.length + manual.length;
+  V.n = n;
+  V.id = new Array(n); V.name = new Array(n); V.latin = new Array(n);
+  V.cat = new Array(n); V.dist = new Array(n); V.src = new Array(n);
+  V.lat = new Float64Array(n); V.lng = new Float64Array(n);
+  V.x = new Float32Array(n); V.y = new Float32Array(n);
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const lat = r[CI.lat] / 1e5;
+    const lng = r[CI.lng] / 1e5;
+    V.id[i] = r[CI.id]; V.name[i] = r[CI.name]; V.latin[i] = r[CI.latin];
+    V.cat[i] = r[CI.cat]; V.dist[i] = r[CI.dist]; V.src[i] = "osm";
+    V.lat[i] = lat; V.lng[i] = lng; V.x[i] = WX(lng); V.y[i] = WY(lat);
+  }
+  for (let k = 0; k < manual.length; k++) {
+    const i = rows.length + k;
+    const m = manual[k];
+    V.id[i] = m.id; V.name[i] = m.name; V.latin[i] = m.nameLatin;
+    V.cat[i] = m.category; V.dist[i] = m.district; V.src[i] = "manual";
+    V.lat[i] = m.lat; V.lng[i] = m.lng; V.x[i] = WX(m.lng); V.y[i] = WY(m.lat);
+  }
+}
+
+const venueAt = (i) => ({
+  id: V.id[i], name: V.name[i], nameLatin: V.latin[i],
+  category: V.cat[i], district: V.dist[i],
+  lat: V.lat[i], lng: V.lng[i], source: V.src[i],
+});
+
+/* ============================================================== rendering */
+
+const RGB = {
+  ink: "11,26,43", abyss: "6,17,28", engrave: "127,169,196",
+  rubbing: "240,226,200", nova: "255,176,58", sear: "255,242,212",
+};
+
+const cv = $("map");
+const ctx = cv.getContext("2d", { alpha: false });
+let W = 0, H = 0, DPR = 1, CROP = 0;
+
+/* Layer 0 — the static chart. Re-rendering Shanghai's road network every
+   frame puts an iPad at about 15 fps, so it is baked into its own canvas
+   with a margin and blitted. DESIGN.md §5. */
+const CACHE_PAD = 1.4;
+const l0 = document.createElement("canvas");
+const l0ctx = l0.getContext("2d", { alpha: false });
+const l0view = { x: 0, y: 0, s: 0, w: 0, h: 0, valid: false };
+
+/* Layer 2 — bloom at quarter resolution, upscaled 4x. The upscale is the
+   blur, and it costs almost nothing. DESIGN.md §4.3. */
+const BLOOM_DIV = 4;
+const bl = document.createElement("canvas");
+const blctx = bl.getContext("2d", { alpha: true });
+
+let grainPattern = null;
+let vignette = null;
+
+function makeStarSprite(rgb, size) {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
+  const r = size / 2;
+  const grd = g.createRadialGradient(r, r, 0, r, r, r);
+  grd.addColorStop(0.0, `rgba(${rgb},1)`);
+  grd.addColorStop(0.16, `rgba(${rgb},0.62)`);
+  grd.addColorStop(0.38, `rgba(${rgb},0.16)`);
+  grd.addColorStop(0.7, `rgba(${rgb},0.03)`);
+  grd.addColorStop(1.0, `rgba(${rgb},0)`);
+  g.fillStyle = grd;
+  g.fillRect(0, 0, size, size);
+  return c;
+}
+const SPR = {
+  cool: makeStarSprite(RGB.engrave, 64),
+  warm: makeStarSprite(RGB.rubbing, 64),
+  nova: makeStarSprite(RGB.nova, 128),
+  sear: makeStarSprite(RGB.sear, 128),
+};
+
+/* Grain. Kills banding in the big dark gradients, supplies the ink-rubbing
+   texture, and — the reason it is not optional — gives a video encoder
+   something to hold onto, so the map survives compression. DESIGN.md §4.7. */
+function makeGrain() {
+  const s = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const g = c.getContext("2d");
+  const img = g.createImageData(s, s);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() * 255) | 0;
+    img.data[i] = n * 0.86;      // tinted a touch toward the engraved blue
+    img.data[i + 1] = n * 0.94;
+    img.data[i + 2] = n;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  grainPattern = ctx.createPattern(c, "repeat");
+}
+
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1); // above 2 the gain is invisible
+  W = Math.max(1, window.innerWidth);
+  H = Math.max(1, window.innerHeight);
+  cv.width = Math.round(W * DPR);
+  cv.height = Math.round(H * DPR);
+  cv.style.width = W + "px";
+  cv.style.height = H + "px";
+
+  bl.width = Math.max(1, Math.round((W * DPR) / BLOOM_DIV));
+  bl.height = Math.max(1, Math.round((H * DPR) / BLOOM_DIV));
+
+  l0.width = Math.round(W * CACHE_PAD * DPR);
+  l0.height = Math.round(H * CACHE_PAD * DPR);
+  l0view.valid = false;
+
+  // The filmed crop: a 9:16 slice of a 4:3 screen. Everything in the result
+  // has to fit inside it; every control has to fall outside it.
+  CROP = Math.min(W, H * (9 / 16));
+  const root = document.documentElement.style;
+  root.setProperty("--crop", CROP + "px");
+  root.setProperty("--gutter", (W - CROP) / 2 + "px");
+
+  const gx = W / 2, gy = H / 2;
+  vignette = ctx.createRadialGradient(gx, gy, 0, gx, gy, Math.hypot(W, H) / 2);
+  vignette.addColorStop(0, `rgba(${RGB.abyss},0)`);
+  vignette.addColorStop(0.55, `rgba(${RGB.abyss},0.16)`);
+  vignette.addColorStop(1, `rgba(${RGB.abyss},0.55)`);
+
+  if (!grainPattern) makeGrain();
+}
+
+/* ---------------------------------------------------------- the viewport */
+
+const view = { x: 0, y: 0, s: 3000 };      // where we are
+const target = { x: 0, y: 0, s: 3000 };    // where we are heading
+const vel = { x: 0, y: 0, s: 0 };
+let springing = false;
+
+const sx = (wx) => (wx - view.x) * view.s + W / 2;
+const sy = (wy) => (wy - view.y) * view.s + H / 2;
+const unx = (px) => (px - W / 2) / view.s + view.x;
+const uny = (py) => (py - H / 2) / view.s + view.y;
+
+/* Critically damped, stiffness 90, damping 18. Never linear, never
+   ease-in-out: viewport travel has to feel like mass. DESIGN.md §6.
+   Scale springs in log space or the zoom lurches. */
+const SPRING_K = 90, SPRING_C = 18;
+function stepSpring(dt) {
+  if (!springing) return;
+  const h = Math.min(dt, 0.032);
+  let moving = false;
+
+  if (focus.on) {
+    for (const [cur, tgt, v] of [["px", "tx", "vx"], ["py", "ty", "vy"]]) {
+      const a = SPRING_K * (focus[tgt] - focus[cur]) - SPRING_C * focus[v];
+      focus[v] += a * h;
+      focus[cur] += focus[v] * h;
+      if (Math.abs(focus[tgt] - focus[cur]) > 0.05 || Math.abs(focus[v]) > 0.05) moving = true;
+    }
+    const ls0 = Math.log(view.s), lt0 = Math.log(target.s);
+    const as = SPRING_K * (lt0 - ls0) - SPRING_C * vel.s;
+    vel.s += as * h;
+    view.s = Math.exp(ls0 + vel.s * h);
+    if (Math.abs(lt0 - Math.log(view.s)) > 1e-4 || Math.abs(vel.s) > 1e-4) moving = true;
+
+    // hold the anchor exactly where the spring says it is
+    view.x = focus.wx - (focus.px - W / 2) / view.s;
+    view.y = focus.wy - (focus.py - H / 2) / view.s;
+
+    if (!moving) {
+      view.s = target.s;
+      view.x = focus.wx - (focus.tx - W / 2) / view.s;
+      view.y = focus.wy - (focus.ty - H / 2) / view.s;
+      focus.on = false;
+      springing = false;
+      vel.x = vel.y = vel.s = 0;
+      l0view.valid = false; // settle: re-bake sharp. this is "roads resolve".
+    }
+    target.x = view.x;
+    target.y = view.y;
+    return;
+  }
+
+  for (const axis of ["x", "y"]) {
+    const a = SPRING_K * (target[axis] - view[axis]) - SPRING_C * vel[axis];
+    vel[axis] += a * h;
+    view[axis] += vel[axis] * h;
+    if (Math.abs(target[axis] - view[axis]) > 1e-6 || Math.abs(vel[axis]) > 1e-6) moving = true;
+  }
+  const ls = Math.log(view.s), lt = Math.log(target.s);
+  const a = SPRING_K * (lt - ls) - SPRING_C * vel.s;
+  vel.s += a * h;
+  view.s = Math.exp(ls + vel.s * h);
+  if (Math.abs(lt - Math.log(view.s)) > 1e-5 || Math.abs(vel.s) > 1e-5) moving = true;
+
+  if (!moving) {
+    view.x = target.x; view.y = target.y; view.s = target.s;
+    vel.x = vel.y = vel.s = 0;
+    springing = false;
+    l0view.valid = false; // settle: re-bake sharp. this is "roads resolve".
+  }
+}
+/* Travel that keeps its subject on screen.
+
+   Springing the world-space centre while the scale is also changing throws
+   any off-centre point clear out of frame and back — at the nova that means
+   the star vanishes for a third of a second, at the exact moment it ignites.
+   So the spring runs on the subject's *screen* position instead: the anchor
+   glides from where it already is to where it belongs while the zoom happens
+   around it, and it cannot leave the frame on the way. Still critically
+   damped, still with mass. */
+const focus = { on: false, wx: 0, wy: 0, px: 0, py: 0, tx: 0, ty: 0, vx: 0, vy: 0 };
+
+function focusOn(wx, wy, screenX, screenY, scale) {
+  focus.on = true;
+  focus.wx = wx; focus.wy = wy;
+  focus.px = sx(wx); focus.py = sy(wy);   // where it is now
+  focus.tx = screenX; focus.ty = screenY; // where it should end up
+  focus.vx = 0; focus.vy = 0;
+  target.s = scale;
+  vel.s = 0;
+  springing = true;
+}
+
+function springTo(x, y, s) {
+  focus.on = false;
+  target.x = x; target.y = y; target.s = s;
+  springing = true;
+}
+function jumpTo(x, y, s) {
+  focus.on = false;
+  view.x = target.x = x; view.y = target.y = y; view.s = target.s = s;
+  vel.x = vel.y = vel.s = 0;
+  springing = false;
+  l0view.valid = false;
+}
+
+/* Level of detail. Also cartography: the whole city with every residential
+   street drawn is a grey mat, not a chart. */
+const LOD_W2 = 4200;
+const LOD_W3 = 13000;
+const LOD_LABELS = 26000;
+
+function drawLines(g, pack, view0, vx0, vy0, vx1, vy1, width, stroke, casing) {
+  const { xy, off, box, count } = pack;
+  if (!count) return;
+  const scale = view0.s;
+  // casing first, then fill: a road stroked once merges into its neighbours.
+  const passes = casing ? [[width + 3, `rgba(${RGB.abyss},1)`], [width, stroke]] : [[width, stroke]];
+  for (const [lw, style] of passes) {
+    g.lineWidth = lw;
+    g.strokeStyle = style;
+    g.beginPath();
+    for (let i = 0; i < count; i++) {
+      const b = i * 4;
+      if (box[b + 2] < vx0 || box[b] > vx1 || box[b + 3] < vy0 || box[b + 1] > vy1) continue;
+      const a0 = off[i], a1 = off[i + 1];
+      if (a1 - a0 < 2) continue;
+      for (let p = a0; p < a1; p++) {
+        const px = (xy[p * 2] - view0.x) * scale + view0.w / 2;
+        const py = (xy[p * 2 + 1] - view0.y) * scale + view0.h / 2;
+        if (p === a0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      }
+    }
+    g.stroke();
+  }
+}
+
+function fillPolys(g, pack, view0, vx0, vy0, vx1, vy1, style) {
+  const { xy, off, box, count } = pack;
+  if (!count) return;
+  g.fillStyle = style;
+  g.beginPath();
+  for (let i = 0; i < count; i++) {
+    const b = i * 4;
+    if (box[b + 2] < vx0 || box[b] > vx1 || box[b + 3] < vy0 || box[b + 1] > vy1) continue;
+    const a0 = off[i], a1 = off[i + 1];
+    if (a1 - a0 < 3) continue;
+    for (let p = a0; p < a1; p++) {
+      const px = (xy[p * 2] - view0.x) * view0.s + view0.w / 2;
+      const py = (xy[p * 2 + 1] - view0.y) * view0.s + view0.h / 2;
+      if (p === a0) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+    g.closePath();
+  }
+  g.fill();
+}
+
+/* Bake the static chart. Called on settle and on zoom steps, never per frame. */
+function bakeLayer0() {
+  const cw = l0.width / DPR, ch = l0.height / DPR;
+  l0ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  l0ctx.fillStyle = `rgb(${RGB.ink})`;
+  l0ctx.fillRect(0, 0, cw, ch);
+
+  const v0 = { x: view.x, y: view.y, s: view.s, w: cw, h: ch };
+  const halfW = cw / 2 / view.s, halfH = ch / 2 / view.s;
+  const vx0 = view.x - halfW, vx1 = view.x + halfW;
+  const vy0 = view.y - halfH, vy1 = view.y + halfH;
+
+  l0ctx.lineCap = "round";
+  l0ctx.lineJoin = "round";
+
+  /* The opacity ladder in DESIGN.md §2 is calibrated for a working zoom,
+     where a few dozen roads are on screen. With the whole city in frame
+     there are fourteen thousand, and at full strength they stop being
+     texture and start being navigation — which the same section says to
+     resolve in favour of the stars, every time. So the ladder holds at
+     working zoom and tapers as the view pulls out. */
+  const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
+  const roadFade = 0.52 + 0.48 * zf;
+
+  fillPolys(l0ctx, G.water, v0, vx0, vy0, vx1, vy1, `rgb(${RGB.abyss})`);
+  // Green is not a seventh colour: it is the engraved blue, barely raised.
+  fillPolys(l0ctx, G.green, v0, vx0, vy0, vx1, vy1, `rgba(${RGB.engrave},0.055)`);
+
+  const ink = (base) => `rgba(${RGB.engrave},${(base * roadFade).toFixed(3)})`;
+  if (view.s > LOD_W3) drawLines(l0ctx, G.w3, v0, vx0, vy0, vx1, vy1, 3.0, ink(0.09), true);
+  if (view.s > LOD_W2) drawLines(l0ctx, G.w2, v0, vx0, vy0, vx1, vy1, 3.0, ink(0.17), true);
+  drawLines(l0ctx, G.w1, v0, vx0, vy0, vx1, vy1, 3.5, ink(0.30), true);
+
+  l0view.x = view.x; l0view.y = view.y; l0view.s = view.s;
+  l0view.w = cw; l0view.h = ch;
+  l0view.valid = true;
+}
+
+function layer0NeedsBake() {
+  if (!l0view.valid) return true;
+  const r = view.s / l0view.s;
+  if (r < 0.82 || r > 1.22) return true;
+  // has the viewport wandered out of the baked margin?
+  const dx = Math.abs(view.x - l0view.x) * view.s;
+  const dy = Math.abs(view.y - l0view.y) * view.s;
+  const marginX = (l0view.w * r - W) / 2;
+  const marginY = (l0view.h * r - H) / 2;
+  return dx > marginX || dy > marginY;
+}
+
+function blitLayer0() {
+  const r = view.s / l0view.s;
+  const dw = l0view.w * r, dh = l0view.h * r;
+  const dx = (l0view.x - view.x) * view.s + W / 2 - dw / 2;
+  const dy = (l0view.y - view.y) * view.s + H / 2 - dh / 2;
+  // Outside the baked margin during a fast travel: paint the ground first so
+  // no seam shows at the edge.
+  ctx.fillStyle = `rgb(${RGB.ink})`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(l0, dx, dy, dw, dh);
+}
+
+/* ------------------------------------------------------- constellations
+   Each venue joined to its two or three nearest neighbours within ~400 m.
+   Computed at load rather than baked into the data file: it costs about
+   30 ms over a uniform grid, keeps roughly a megabyte out of the bundle,
+   and — the deciding reason — manually added places have to join the
+   pattern too, which a build-time table cannot do. */
+const LINK_RADIUS = 400 / 110540;  // 400 m expressed in latitude degrees
+const LINK_MAX = 3;
+let LINKS = new Int32Array(0);
+
+function buildConstellations() {
+  const cell = LINK_RADIUS;
+  const grid = new Map();
+  const key = (cx, cy) => cx * 100000 + cy;
+  for (let i = 0; i < V.n; i++) {
+    const k = key(Math.floor(V.x[i] / cell), Math.floor(V.y[i] / cell));
+    let bucket = grid.get(k);
+    if (!bucket) grid.set(k, (bucket = []));
+    bucket.push(i);
+  }
+  const pairs = [];
+  const seen = new Set();
+  const cand = [];
+  for (let i = 0; i < V.n; i++) {
+    const cx = Math.floor(V.x[i] / cell), cy = Math.floor(V.y[i] / cell);
+    cand.length = 0;
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        const bucket = grid.get(key(cx + ox, cy + oy));
+        if (!bucket) continue;
+        for (const j of bucket) {
+          if (j === i) continue;
+          const dx = V.x[j] - V.x[i], dy = V.y[j] - V.y[i];
+          const d2 = dx * dx + dy * dy;
+          if (d2 <= LINK_RADIUS * LINK_RADIUS) cand.push([d2, j]);
+        }
+      }
+    }
+    cand.sort((a, b) => a[0] - b[0]);
+    for (let k = 0; k < Math.min(LINK_MAX, cand.length); k++) {
+      const j = cand[k][1];
+      const a = i < j ? i : j, b = i < j ? j : i;
+      const sig = a * 1000000 + b;
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      pairs.push(a, b);
+    }
+  }
+  LINKS = Int32Array.from(pairs);
+}
+
+/* --------------------------------------------------------- star state */
+
+const S = {
+  phase1: null, phase2: null,
+  outAt: null,        // ms timestamp at which this star goes dark
+  cand: null,         // 1 = in the current candidate pool
+  visited: null,      // 1 = catalogued, warm, never selected again
+  linkAlive: null,
+};
+
+function allocStarState() {
+  S.phase1 = new Float32Array(V.n);
+  S.phase2 = new Float32Array(V.n);
+  S.outAt = new Float64Array(V.n);
+  S.cand = new Uint8Array(V.n);
+  S.visited = new Uint8Array(V.n);
+  for (let i = 0; i < V.n; i++) {
+    S.phase1[i] = Math.random() * Math.PI * 2;
+    S.phase2[i] = Math.random() * Math.PI * 2;
+    S.outAt[i] = Infinity;
+  }
+}
+
+/* Two sines at incommensurate frequencies. One sine gives a rhythm the eye
+   locks onto inside fifteen seconds, and the map starts looking mechanical
+   exactly when it should feel alive. DESIGN.md §4.6. */
+function breathe(i, t) {
+  return 0.62 + 0.13 * Math.sin(t * 0.00071 + S.phase1[i]) + 0.09 * Math.sin(t * 0.00113 + S.phase2[i]);
+}
+
+const EASE_OUT_FAST = (u) => 1 - Math.pow(1 - u, 3);      // extinguish tail
+const clamp01 = (u) => (u < 0 ? 0 : u > 1 ? 1 : u);
+
+/* Stars away from the centre lose a little brightness: the chart then feels
+   like it is being looked at rather than displayed flat. DESIGN.md §4.5 */
+let halfDiag = 1;
+function depthFade(px, py) {
+  const d = Math.hypot(px - W / 2, py - H / 2) / halfDiag;
+  return 1 - 0.15 * clamp01(d);
+}
+
+function drawStarField(g, gs, t) {
+  g.globalCompositeOperation = "lighter";
+  const pad = 40;
+
+  /* Additive light sums, which is the point — dense districts glow brighter
+     with no heatmap layer. But a star drawn at close-up size while the whole
+     city is on screen covers half a district, and four thousand of them stack
+     the centre straight past white: the bloom clips and Huangpu turns into a
+     flat blob with no structure left in it. So the stars shrink and dim as
+     the view pulls out. The density gradient survives, the core stops
+     clipping, and points stay countable. */
+  const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
+  const sizeScale = 0.42 + 0.58 * zf;
+  const alphaScale = 0.46 + 0.54 * zf;
+  for (let i = 0; i < V.n; i++) {
+    const isC = S.cand[i], isV = S.visited[i];
+    if (!isC && !isV) continue;
+    const px = sx(V.x[i]) * gs, py = sy(V.y[i]) * gs;
+    if (px < -pad || py < -pad || px > W * gs + pad || py > H * gs + pad) continue;
+
+    let a, sprite, size;
+    if (isV) {
+      // Catalogued. Warm, permanent, and quietly steady next to the others.
+      a = (0.55 + 0.06 * Math.sin(t * 0.00071 + S.phase1[i])) * alphaScale;
+      sprite = SPR.warm;
+      size = 26 * gs * sizeScale;
+    } else {
+      a = breathe(i, t) * alphaScale;
+      sprite = SPR.cool;
+      size = 22 * gs * sizeScale;
+      const out = S.outAt[i];
+      if (out !== Infinity) {
+        if (t >= out + 220) continue;                    // gone
+        if (t >= out) a *= 1 - EASE_OUT_FAST(clamp01((t - out) / 220));
+      }
+    }
+    if (spin.phase === "closing" && spin.finalists.includes(i)) {
+      // By now they are the only three stars left on the whole chart, and
+      // they light in turn. Breathing and the wide-zoom dimming would leave
+      // them fainter than the roads, so the survivors are driven, not scaled.
+      a = 0.95 * spin.blinkAlpha(i, t);
+      size = 22 * gs * sizeScale * 1.6;
+    }
+    a *= depthFade(px / gs, py / gs);
+    a += spin.flare(px / gs, py / gs, t);
+    if (a <= 0.02) continue;
+    g.globalAlpha = Math.min(1, a);
+    g.drawImage(sprite, px - size / 2, py - size / 2, size, size);
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = "source-over";
+}
+
+/* Lines retract toward the surviving end rather than vanishing, survivors
+   brighten as the field thins, and the last three hold a bright triangle.
+   This is the element the whole direction rests on. DESIGN.md §3. */
+function drawConstellations(t) {
+  if (!LINKS.length) return;
+  const aliveFrac = spin.aliveFraction();
+  const base = 0.07 + (0.35 - 0.07) * (1 - aliveFrac);
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(${RGB.engrave},${base.toFixed(3)})`;
+  ctx.beginPath();
+
+  const retracting = [];
+  for (let k = 0; k < LINKS.length; k += 2) {
+    const i = LINKS[k], j = LINKS[k + 1];
+    if (!(S.cand[i] || S.visited[i]) || !(S.cand[j] || S.visited[j])) continue;
+    const oi = S.visited[i] ? Infinity : S.outAt[i];
+    const oj = S.visited[j] ? Infinity : S.outAt[j];
+    // Infinity compares correctly through both tests, so a line between two
+    // living stars falls straight through to the full-length draw.
+    const first = Math.min(oi, oj);
+    if (t >= first + 180) continue;                       // fully retracted
+    if (t >= first) {
+      retracting.push([i, j, first, oi <= oj ? j : i]);    // pulling back
+      continue;
+    }
+    const ax = sx(V.x[i]), ay = sy(V.y[i]);
+    const bx = sx(V.x[j]), by = sy(V.y[j]);
+    if ((ax < 0 && bx < 0) || (ax > W && bx > W) || (ay < 0 && by < 0) || (ay > H && by > H)) continue;
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+  }
+  ctx.stroke();
+
+  // cubic-bezier(.2,.9,.3,1) over 180 ms, toward whichever end survives
+  for (const [i, j, at, survivor] of retracting) {
+    const u = clamp01((t - at) / 180);
+    const e = 1 - Math.pow(1 - u, 2.2);
+    const other = survivor === i ? j : i;
+    const ax = sx(V.x[survivor]), ay = sy(V.y[survivor]);
+    const bx = sx(V.x[other]), by = sy(V.y[other]);
+    ctx.strokeStyle = `rgba(${RGB.engrave},${(base * (1 - u)).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax + (bx - ax) * (1 - e), ay + (by - ay) * (1 - e));
+    ctx.stroke();
+  }
+
+  // the triangle: three survivors alone in the dark
+  if (spin.phase === "closing" || spin.phase === "locked" || spin.phase === "rule" || spin.phase === "resting") {
+    const f = spin.finalists;
+    if (f.length === 3) {
+      ctx.strokeStyle = `rgba(${RGB.engrave},${(0.6 * spin.triangleAlpha(t)).toFixed(3)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let k = 0; k < 3; k++) {
+        const a = f[k], b = f[(k + 1) % 3];
+        ctx.moveTo(sx(V.x[a]), sy(V.y[a]));
+        ctx.lineTo(sx(V.x[b]), sy(V.y[b]));
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+/* ------------------------------------------------------------- the nova */
+
+const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function drawNova(t) {
+  const wi = spin.winner;
+  if (wi < 0 || spin.lockedAt == null) return;
+  const el = t - spin.lockedAt;
+  if (el < 0) return;
+  const px = sx(V.x[wi]), py = sy(V.y[wi]);
+
+  ctx.globalCompositeOperation = "lighter";
+
+  const pulse = 1 + 0.05 * Math.sin(t * 0.0016);
+  ctx.globalAlpha = 1;
+  ctx.drawImage(SPR.nova, px - 90 * pulse, py - 90 * pulse, 180 * pulse, 180 * pulse);
+  ctx.globalAlpha = 0.9;
+  ctx.drawImage(SPR.sear, px - 34, py - 34, 68, 68);
+  ctx.globalAlpha = 1;
+
+  // two rings, cubic-bezier(0,.6,.3,1), 1600 ms
+  for (const delay of [0, 260]) {
+    const u = clamp01((el - delay) / 1600);
+    if (u <= 0 || u >= 1) continue;
+    const e = 1 - Math.pow(1 - u, 2.6);
+    ctx.strokeStyle = `rgba(${RGB.nova},${(0.85 * (1 - u) * (1 - u)).toFixed(3)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(px, py, 18 + e * 250, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  /* Diffraction spikes. Every photograph of a bright light has them, and
+     they are what makes a source read as bright rather than merely large.
+     A flash, not an ornament: gone in 900 ms. DESIGN.md §4.4 */
+  if (!REDUCED) {
+    const u = clamp01(el / 900);
+    if (u < 1) {
+      const a = (1 - u) * 0.9;
+      const len = 40 * (0.6 + 0.4 * (1 - u));
+      ctx.lineWidth = 3;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const grd = ctx.createLinearGradient(px, py, px + dx * len, py + dy * len);
+        grd.addColorStop(0, `rgba(${RGB.sear},${a.toFixed(3)})`);
+        grd.addColorStop(1, `rgba(${RGB.sear},0)`);
+        ctx.strokeStyle = grd;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + dx * len, py + dy * len);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+}
+
+/* Street names around the winner. Resolved once at lock, not per frame:
+   the same street is a hundred separate ways in OSM and the dedupe is the
+   expensive part. */
+let streetLabels = [];
+
+function collectStreetLabels() {
+  streetLabels = [];
+  const wi = spin.winner;
+  if (wi < 0) return;
+  const wx = V.x[wi], wy = V.y[wi];
+  const found = new Map();
+  for (const [pack, idxList] of [[G.w1, ROAD_NAME_IDX.n1], [G.w2, ROAD_NAME_IDX.n2]]) {
+    if (!idxList || !idxList.length) continue;
+    for (let i = 0; i < pack.count; i++) {
+      const ni = idxList[i];
+      if (ni == null || ni < 0) continue;
+      const label = ROAD_NAMES[ni];
+      if (!label) continue;
+      const a0 = pack.off[i], a1 = pack.off[i + 1];
+      let bestD = Infinity, bx = 0, by = 0;
+      for (let p = a0; p < a1; p++) {
+        const dx = pack.xy[p * 2] - wx, dy = pack.xy[p * 2 + 1] - wy;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; bx = pack.xy[p * 2]; by = pack.xy[p * 2 + 1]; }
+      }
+      const prev = found.get(label);
+      if (!prev || bestD < prev.d) found.set(label, { d: bestD, x: bx, y: by });
+    }
+  }
+  streetLabels = [...found.entries()]
+    .map(([label, v]) => ({ label, ...v }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 6);
+}
+
+function drawStreetLabels(t) {
+  if (!streetLabels.length || spin.lockedAt == null) return;
+  const el = t - spin.lockedAt;
+  const a = clamp01(el / 700) * 0.55;
+  if (a <= 0.01) return;
+  ctx.font = '700 12px ui-monospace, "SF Mono", Menlo, monospace';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const gutter = (W - CROP) / 2;
+  // Streets converge, so their nearest points to the winner do too. Labels
+  // are already sorted nearest-first, so the closest street wins the space
+  // and any later one that would collide with it is simply dropped.
+  const placed = [];
+  for (const s of streetLabels) {
+    const px = sx(s.x), py = sy(s.y);
+    if (px < 24 || px > W - 24 || py < 24 || py > H - 24) continue;
+    // never behind the result block, which owns the centre of the crop
+    if (px > gutter - 40 && px < W - gutter + 40 && py > H * 0.29 && py < H * 0.82) continue;
+    const parts = s.label.split("|");
+    const latin = parts[0], zh = parts[1];
+
+    const halfW = Math.max(
+      latin ? ctx.measureText(latin.toUpperCase()).width / 2 : 0,
+      zh ? zh.length * 8 : 0
+    ) + 10;
+    const box = { x0: px - halfW, x1: px + halfW, y0: py - 13, y1: py + (zh ? 30 : 13) };
+    if (placed.some((b) => b.x0 < box.x1 && b.x1 > box.x0 && b.y0 < box.y1 && b.y1 > box.y0)) continue;
+    placed.push(box);
+    ctx.fillStyle = `rgba(${RGB.engrave},${a.toFixed(3)})`;
+    if (latin) {
+      ctx.letterSpacing = "0.2em";
+      ctx.fillText(latin.toUpperCase(), px, py);
+    }
+    if (zh) {
+      ctx.font = '600 13px "PingFang SC", "Noto Sans CJK SC", sans-serif';
+      ctx.letterSpacing = "0.14em";
+      ctx.fillText(zh, px, py + (latin ? 18 : 0));
+      ctx.font = '700 12px ui-monospace, "SF Mono", Menlo, monospace';
+    }
+  }
+  ctx.letterSpacing = "0px";
+  ctx.textAlign = "left";
+}
+
+/* -------------------------------------------------------------- the grade
+   Vignette, grain, and one soft-light pass that lifts the shadows toward
+   blue the way a film grade does, so the dark areas do not read as dead
+   digital black. DESIGN.md §4.8 */
+function drawGrade() {
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // grain in device pixels, never scaled
+  ctx.globalAlpha = 0.035;
+  ctx.fillStyle = grainPattern;
+  ctx.translate((Math.random() * 128) | 0, (Math.random() * 128) | 0);
+  ctx.fillRect(-128, -128, cv.width + 256, cv.height + 256);
+  ctx.restore();
+
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.fillStyle = `rgba(${RGB.engrave},0.03)`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = "source-over";
+}
+
+/* ---------------------------------------------------------- the frame */
+
+let lastFrame = 0;
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = lastFrame ? (now - lastFrame) / 1000 : 0.016;
+  lastFrame = now;
+
+  stepSpring(dt);
+  spin.tick(now);
+  applyShake(now);
+
+  halfDiag = Math.hypot(W, H) / 2;
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  if (layer0NeedsBake()) bakeLayer0();
+  blitLayer0();
+
+  drawConstellations(now);
+  drawTapRing(now);
+
+  // bloom: quarter res, upscaled 4x, additive — the upscale is the blur
+  blctx.setTransform(1, 0, 0, 1, 0, 0);
+  blctx.clearRect(0, 0, bl.width, bl.height);
+  blctx.setTransform((DPR / BLOOM_DIV), 0, 0, (DPR / BLOOM_DIV), 0, 0);
+  drawStarField(blctx, 1, now);
+  ctx.globalAlpha = 0.5;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.drawImage(bl, 0, 0, W, H);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+
+  drawStarField(ctx, 1, now);
+  drawNova(now);
+  drawStreetLabels(now);
+  drawPositionMark();
+  drawGrade();
+}
+
+/* The tap ring: one ring expands from the finger across the sky, and the
+   stars flare as it passes. DESIGN.md §6, t=0. */
+function drawTapRing(t) {
+  if (!spin.tapPoint || spin.phase === "idle" || spin.phase === "resting") return;
+  const el = t - spin.t0;
+  if (el < 0 || el > 1100) return;
+  const u = el / 1100;
+  const r = u * Math.hypot(W, H);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = `rgba(${RGB.engrave},${(0.5 * (1 - u) * (1 - u)).toFixed(3)})`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(spin.tapPoint[0], spin.tapPoint[1], r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalCompositeOperation = "source-over";
+}
+
+/* the "I'm here" mark — a small open circle, never a star */
+function drawPositionMark() {
+  if (!filters.pos) return;
+  const px = sx(WX(filters.pos.lng)), py = sy(WY(filters.pos.lat));
+  if (px < -20 || py < -20 || px > W + 20 || py > H + 20) return;
+  ctx.strokeStyle = `rgba(${RGB.rubbing},0.5)`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(px, py, 11, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(px, py, 3, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/* screen shake — 12 px on the nova, 7 px on the rule lock */
+let shake = { until: 0, mag: 0 };
+function kickShake(mag, ms) {
+  if (REDUCED) return;
+  shake.mag = mag;
+  shake.until = performance.now() + ms;
+}
+function applyShake(now) {
+  const stage = $("stage"), res = $("result");
+  if (now > shake.until) {
+    stage.style.transform = "";
+    res.style.transform = "translate(-50%,-50%)";
+    return;
+  }
+  const left = (shake.until - now) / 340;
+  const m = shake.mag * left * left;
+  const dx = (Math.random() * 2 - 1) * m;
+  const dy = (Math.random() * 2 - 1) * m;
+  stage.style.transform = `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
+  res.style.transform = `translate(-50%,-50%) translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
+}
+
+/* ================================================================= sound
+   Generated, never files — offline is absolute. The AudioContext is built
+   inside the first tap handler, never on load: iOS refuses otherwise.
+   CLAUDE.md, known traps. */
+const audio = {
+  ac: null, bedOsc: null, bedGain: null, on: true,
+
+  ensure() {
+    if (this.ac) {
+      if (this.ac.state === "suspended") this.ac.resume().catch(() => {});
+      return this.ac;
+    }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      this.ac = new AC();
+      if (this.ac.state === "suspended") this.ac.resume().catch(() => {});
+    } catch (e) {
+      this.ac = null;
+    }
+    return this.ac;
+  },
+
+  // 48 Hz sine under everything, from the first tap onward
+  startBed() {
+    const ac = this.ensure();
+    if (!ac || this.bedOsc || !this.on) return;
+    try {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 48;
+      g.gain.value = 0;
+      osc.connect(g).connect(ac.destination);
+      osc.start();
+      g.gain.linearRampToValueAtTime(0.05, ac.currentTime + 1.2);
+      this.bedOsc = osc;
+      this.bedGain = g;
+    } catch (e) {}
+  },
+
+  blip(freq, dur, type, peak) {
+    const ac = this.ensure();
+    if (!ac || !this.on) return;
+    try {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      g.gain.value = 0;
+      osc.connect(g).connect(ac.destination);
+      const t = ac.currentTime;
+      g.gain.linearRampToValueAtTime(peak, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    } catch (e) {}
+  },
+
+  // pitch falls as the stars run out — the ear reads it as a countdown,
+  // which does the work of an on-screen timer without one existing
+  tick(remainingFraction) {
+    this.blip(340 + 520 * clamp01(remainingFraction), 0.09, "triangle", 0.09);
+  },
+
+  sweep(from, to, ms, peak) {
+    const ac = this.ensure();
+    if (!ac || !this.on) return;
+    try {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = "sine";
+      const t = ac.currentTime;
+      osc.frequency.setValueAtTime(from, t);
+      osc.frequency.exponentialRampToValueAtTime(to, t + ms / 1000);
+      g.gain.value = 0;
+      osc.connect(g).connect(ac.destination);
+      g.gain.linearRampToValueAtTime(peak, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000 + 0.1);
+      osc.start(t);
+      osc.stop(t + ms / 1000 + 0.15);
+    } catch (e) {}
+  },
+
+  nova() { this.sweep(120, 38, 500, 0.5); },        // felt more than heard
+  ruleLock() { this.sweep(260, 96, 320, 0.32); },   // shorter, higher, a sibling
+};
+
+/* ========================================================= the spin
+   Times from the tap, in milliseconds. DESIGN.md §6. These numbers are the
+   product; do not round them off.
+
+   The 0.7 s silence at 4200 is load-bearing. It turns one event into two
+   and is the single largest retention device in the sequence. */
+const T = {
+  EXTINCT_FROM: 200,
+  EXTINCT_TO: 2200,
+  APPROACH_TO: 3400,
+  THREE_TO: 4200,
+  LOCK: 4200,
+  SILENCE_TO: 4900,
+  RULE_TO: 6250,
+};
+const BLINK_STEPS = [200, 250, 350]; // in turn, slowing, none under 200 ms
+
+/* One continuous take, and the outcome is fixed the instant he taps. */
+function secureRandom(n) {
+  try {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] % n;
+  } catch (e) {
+    return Math.floor(Math.random() * n);
+  }
+}
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = secureRandom(i + 1);
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+const spin = {
+  phase: "idle",
+  t0: 0,
+  pool: [],
+  order: [],
+  finalists: [],
+  winner: -1,
+  lockedAt: null,
+  ruleLockedAt: null,
+  ruleFinal: null,
+  ruleShown: null,
+  tapPoint: null,
+  nextTickAt: 0,
+  record: null,
+  rerolls: 0,
+  coordFrom: null,
+
+  aliveFraction() {
+    if (this.phase === "idle" || !this.order.length) return 1;
+    const now = performance.now();
+    let alive = 0;
+    for (const i of this.order) if (now < S.outAt[i]) alive++;
+    return alive / this.order.length;
+  },
+
+  triangleAlpha(t) {
+    if (this.finalists.length !== 3) return 0;
+    const el = t - this.t0;
+    if (el < T.EXTINCT_TO) return 0;
+    if (this.lockedAt != null) return Math.max(0, 1 - (t - this.lockedAt) / 400);
+    return clamp01((el - T.EXTINCT_TO) / 600);
+  },
+
+  blinkAlpha(i, t) {
+    const el = t - this.t0;
+    if (el < T.APPROACH_TO) return 1;
+    if (REDUCED) return 1;
+    let acc = T.APPROACH_TO, lit = -1;
+    for (let k = 0; k < BLINK_STEPS.length; k++) {
+      if (el >= acc && el < acc + BLINK_STEPS[k]) { lit = k; break; }
+      acc += BLINK_STEPS[k];
+    }
+    if (lit < 0) return 1;
+    return this.finalists[lit] === i ? 1.25 : 0.3;
+  },
+
+  // stars flare as the tap ring passes over them
+  flare(px, py, t) {
+    if (!this.tapPoint) return 0;
+    const el = t - this.t0;
+    if (el < 0 || el > 1100) return 0;
+    const r = (el / 1100) * Math.hypot(W, H);
+    const d = Math.abs(Math.hypot(px - this.tapPoint[0], py - this.tapPoint[1]) - r);
+    if (d > 70) return 0;
+    return (1 - d / 70) * (1 - el / 1100) * 0.8;
+  },
+
+  canStart() {
+    return this.phase === "idle" || this.phase === "resting";
+  },
+
+  start(pool, isReroll) {
+    if (!pool.length) return false;
+    audio.startBed();
+
+    this.pool = pool;
+    this.order = shuffled(pool);
+    // The winner is fixed now, at the tap, from a CSP random source.
+    this.finalists = this.order.slice(0, 3);
+    if (this.finalists.length < 3) this.finalists = this.order.slice();
+    this.winner = this.finalists[secureRandom(this.finalists.length)];
+    this.rerolls = isReroll ? this.rerolls + 1 : 0;
+
+    this.t0 = performance.now();
+    this.phase = "eliminating";
+    this.lockedAt = null;
+    this.ruleLockedAt = null;
+    this.ruleFinal = pickRule(V.cat[this.winner]);
+    this.ruleShown = null;
+    this.nextTickAt = this.t0 + T.EXTINCT_FROM;
+    streetLabels = [];
+
+    // extinction schedule
+    const doomed = this.order.filter((i) => !this.finalists.includes(i));
+    const n = doomed.length;
+    for (let i = 0; i < V.n; i++) S.outAt[i] = Infinity;
+    if (REDUCED) {
+      // collapse to a single step, keep the two-beat structure
+      for (const i of doomed) S.outAt[i] = this.t0 + T.EXTINCT_FROM;
+    } else {
+      for (let k = 0; k < n; k++) {
+        const u = n === 1 ? 1 : k / (n - 1);
+        // convex in u: many stars early, thinning out — a deceleration
+        const shaped = Math.pow(u, 2.2) + 0.028 * Math.sin(u * Math.PI * 7);
+        const jitter = (Math.random() - 0.5) * 0.02;
+        const f = clamp01(shaped + jitter);
+        S.outAt[doomed[k]] = this.t0 + T.EXTINCT_FROM + f * (T.EXTINCT_TO - T.EXTINCT_FROM);
+      }
+    }
+
+    setPrompt("");
+    hideResult();
+    return true;
+  },
+
+  tick(now) {
+    if (this.phase === "idle" || this.phase === "resting") return;
+    const el = now - this.t0;
+
+    if (this.phase === "eliminating") {
+      if (!REDUCED && now >= this.nextTickAt && el < T.EXTINCT_TO) {
+        audio.tick(this.aliveFraction());
+        // ticks thin out with the field, matching the visual deceleration
+        this.nextTickAt = now + 95 + 150 * (1 - this.aliveFraction());
+      }
+      if (el >= T.EXTINCT_TO) {
+        this.phase = "closing";
+        this.approach();
+      }
+      return;
+    }
+
+    if (this.phase === "closing") {
+      if (el >= T.LOCK) this.lock(now);
+      return;
+    }
+
+    if (this.phase === "locked") {
+      updateCoordCount(now);
+      if (el >= T.SILENCE_TO) {
+        this.phase = "rule";
+        $("rulebox").classList.add("on");
+      }
+      return;
+    }
+
+    if (this.phase === "rule") {
+      updateCoordCount(now);
+      if (el < T.RULE_TO) {
+        if (REDUCED) {
+          if (this.ruleShown !== this.ruleFinal) showRule(this.ruleFinal);
+        } else {
+          // cycling, decelerating: the interval grows so the last few land
+          // one at a time. Nothing under 200 ms — a filmed screen strobes.
+          const u = clamp01((el - T.SILENCE_TO) / (T.RULE_TO - T.SILENCE_TO));
+          const step = 200 + 420 * u * u;
+          const idx = Math.floor((el - T.SILENCE_TO) / step);
+          if (this._lastRuleIdx !== idx) {
+            this._lastRuleIdx = idx;
+            showRule(D.rules[secureRandom(D.rules.length)]);
+          }
+        }
+      } else {
+        updateCoordCount(now); // land exactly on the real value, not near it
+        showRule(this.ruleFinal);
+        this.ruleLockedAt = now;
+        this.phase = "resting";
+        audio.ruleLock();
+        kickShake(7, 340);
+        wipeIn($("rulebox"));
+        setPrompt("оцени место, когда вернёшься");
+        persistPending();
+      }
+      return;
+    }
+  },
+
+  approach() {
+    // ease the viewport onto the three survivors — critically damped, with mass
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const i of this.finalists) {
+      minx = Math.min(minx, V.x[i]); maxx = Math.max(maxx, V.x[i]);
+      miny = Math.min(miny, V.y[i]); maxy = Math.max(maxy, V.y[i]);
+    }
+    const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
+    const spanX = Math.max(maxx - minx, 1e-4), spanY = Math.max(maxy - miny, 1e-4);
+    // leave the middle of the frame clear: the result block lands there
+    // All three have to be in frame — they light in turn, and the winner
+    // ignites here. A fixed minimum zoom would push finalists on opposite
+    // sides of the city clean off the screen, so the floor is the city fit.
+    const fit = Math.min((W * 0.62) / spanX, (H * 0.5) / spanY);
+    const s = Math.max(cityFitScale() * 0.85, Math.min(fit, 120000));
+    focusOn(cx, cy, W / 2, H * 0.30, s);
+  },
+
+  lock(now) {
+    this.phase = "locked";
+    this.lockedAt = now;
+    for (const i of this.finalists) if (i !== this.winner) S.outAt[i] = now;
+    focusOn(V.x[this.winner], V.y[this.winner], W / 2, H * 0.235, Math.max(view.s, 34000));
+    audio.nova();
+    kickShake(12, 340);
+    collectStreetLabels();
+    this.coordFrom = {
+      lat: V.lat[this.winner] - 0.42,
+      lng: V.lng[this.winner] - 0.42,
+      at: now,
+    };
+    showResult(this.winner);
+  },
+};
+
+/* A rule is drawn independently of the place — except that one that costs
+   money cannot be drawn for a park, a market or a street. SPEC 3.4 */
+const NO_PAYMENT_CATEGORIES = new Set(["park", "market", "street food", "viewpoint", "lanes"]);
+function pickRule(category) {
+  const all = D.rules || [];
+  if (!all.length) return { ru: "", zh: "" };
+  const ok = NO_PAYMENT_CATEGORIES.has(category)
+    ? all.filter((r) => !r.requiresPayment)
+    : all;
+  const list = ok.length ? ok : all;
+  return list[secureRandom(list.length)];
+}
+
+/* ============================================================ app state */
+
+let spins = store.get("sh.spins", []);
+let manual = store.get("sh.manual", []);
+
+const DEFAULT_FILTERS = {
+  radius: 0, // 0 = whole city
+  cats: CATEGORIES.map((c) => c.id),
+  dists: DISTRICTS.map((d) => d.name),
+};
+let filters = Object.assign({}, DEFAULT_FILTERS, store.get("sh.filters", {}));
+filters.pos = store.get("sh.position", null);
+// a filter set saved before a data rebuild can name things that no longer exist
+filters.cats = filters.cats.filter((c) => CATEGORIES.some((x) => x.id === c));
+filters.dists = filters.dists.filter((d) => DISTRICTS.some((x) => x.name === d));
+if (!filters.cats.length) filters.cats = DEFAULT_FILTERS.cats.slice();
+if (!filters.dists.length) filters.dists = DEFAULT_FILTERS.dists.slice();
+
+const RADII = [
+  { km: 1, label: "1 км" },
+  { km: 3, label: "3 км" },
+  { km: 8, label: "8 км" },
+  { km: 0, label: "весь город" },
+];
+
+function saveFilters() {
+  store.set("sh.filters", { radius: filters.radius, cats: filters.cats, dists: filters.dists });
+  store.set("sh.position", filters.pos);
+}
+function saveSpins() { store.set("sh.spins", spins); }
+function saveManual() { store.set("sh.manual", manual); }
+
+const isRated = (r) => r && r.rating && typeof r.rating.stops === "number";
+const visitedRecords = () => spins.filter(isRated);
+
+let indexById = new Map();
+function reindex() {
+  indexById = new Map();
+  for (let i = 0; i < V.n; i++) indexById.set(V.id[i], i);
+}
+
+/* A visited place is never selected again. Rebuilt from the records every
+   time they change, so an edit or a delete is reflected immediately. */
+function markVisited() {
+  S.visited.fill(0);
+  for (const r of visitedRecords()) {
+    const i = indexById.get(r.placeId);
+    if (i != null) S.visited[i] = 1;
+  }
+}
+
+let pool = [];
+function computePool() {
+  const cats = new Set(filters.cats);
+  const dists = new Set(filters.dists);
+  const useRadius = filters.radius > 0 && filters.pos;
+  const out = [];
+  for (let i = 0; i < V.n; i++) {
+    if (S.visited[i]) continue;
+    if (!cats.has(V.cat[i])) continue;
+    if (!dists.has(V.dist[i])) continue;
+    if (useRadius) {
+      const km = haversineKm(filters.pos.lat, filters.pos.lng, V.lat[i], V.lng[i]);
+      if (km > filters.radius) continue;
+    }
+    out.push(i);
+  }
+  return out;
+}
+
+function resetField() {
+  S.outAt.fill(Infinity);
+}
+
+function refreshPool() {
+  markVisited();
+  if (spin.phase === "idle") resetField();
+  pool = computePool();
+  S.cand.fill(0);
+  for (const i of pool) S.cand[i] = 1;
+  updateCount();
+  return pool;
+}
+
+/* ------------------------------------------------------------ result DOM */
+
+function setPrompt(text) {
+  const el = $("prompt");
+  el.textContent = text || "";
+  el.style.display = text ? "" : "none";
+}
+
+function hideResult() {
+  $("result").classList.remove("on");
+  $("rulebox").classList.remove("on");
+  $("ruletext").textContent = "";
+  $("rulezh").textContent = "";
+  spin.ruleShown = null;
+  spin._lastRuleIdx = -1;
+}
+
+function wipeIn(el) {
+  if (REDUCED || !el.animate) return;
+  try {
+    el.animate(
+      [{ clipPath: "inset(0 50% 0 50%)" }, { clipPath: "inset(0 0 0 0)" }],
+      { duration: 420, easing: "cubic-bezier(.2,.9,.3,1)" }
+    );
+  } catch (e) {}
+}
+
+const hasCJK = (s) => !!s && /[㐀-鿿豈-﫿]/.test(s);
+
+function showResult(i) {
+  const v = venueAt(i);
+  const ticket = visitedRecords().length + 1;
+  $("ticketno").textContent = "PLACE " + String(ticket).padStart(3, "0");
+  $("rerollno").textContent = spin.rerolls ? "  ·  RE-ROLL " + spin.rerolls : "";
+
+  const latin = v.nameLatin || (hasCJK(v.name) ? null : v.name);
+  $("pname").textContent = latin || v.name;
+  $("pzh").textContent = hasCJK(v.name) && v.name !== latin ? v.name : "";
+  $("pmeta").textContent = (CAT_LABEL.get(v.category) || v.category) + "  ·  " + (v.district || "");
+
+  if (filters.pos) {
+    const km = haversineKm(filters.pos.lat, filters.pos.lng, v.lat, v.lng);
+    $("pdist").textContent = km.toFixed(1) + " км  ·  примерно " + stopsForKm(km) + " " + plural(stopsForKm(km), "остановка", "остановки", "остановок");
+  } else {
+    $("pdist").textContent = "";
+  }
+
+  $("result").classList.add("on");
+  wipeIn($("pname"));
+  wipeIn($("pzh"));
+}
+
+function plural(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+
+/* Coordinates count up to their final value rather than appearing. Tabular
+   numerals, so nothing shifts width while it counts. */
+function updateCoordCount(now) {
+  const wi = spin.winner;
+  if (wi < 0 || !spin.coordFrom) return;
+  const u = clamp01((now - spin.coordFrom.at) / (T.RULE_TO - T.LOCK));
+  const e = 1 - Math.pow(1 - u, 3);
+  const lat = spin.coordFrom.lat + (V.lat[wi] - spin.coordFrom.lat) * e;
+  const lng = spin.coordFrom.lng + (V.lng[wi] - spin.coordFrom.lng) * e;
+  $("pcoord").textContent =
+    lat.toFixed(5) + "  " + lng.toFixed(5) + "   WGS-84";
+}
+
+function showRule(rule) {
+  spin.ruleShown = rule;
+  $("ruletext").textContent = rule.ru || "";
+  $("rulezh").textContent = rule.zh || "";
+}
+
+/* ------------------------------------------------------- the spin record
+   Written the moment the rule locks, not when the rating is saved. A record
+   that exists with rating:null is recoverable; one that was never written
+   is a trip that happened and vanished. */
+function persistPending() {
+  const wi = spin.winner;
+  if (wi < 0) return;
+  const v = venueAt(wi);
+  const now = new Date();
+  const km = filters.pos ? haversineKm(filters.pos.lat, filters.pos.lng, v.lat, v.lng) : null;
+
+  if (spin.record && spin.record.rating == null) {
+    // a re-roll replaces the pending record rather than leaving a ghost
+    Object.assign(spin.record, {
+      placeId: v.id, place: v, rule: spin.ruleShown,
+      spunAt: iso(now),
+      fromLat: filters.pos ? filters.pos.lat : null,
+      fromLng: filters.pos ? filters.pos.lng : null,
+      distanceKm: km == null ? null : Math.round(km * 10) / 10,
+      rerolls: spin.rerolls,
+      updatedAt: iso(now),
+    });
+  } else {
+    const rec = {
+      id: nextSpinId(),
+      placeId: v.id,
+      place: v,
+      rule: spin.ruleShown,
+      spunAt: iso(now),
+      fromLat: filters.pos ? filters.pos.lat : null,
+      fromLng: filters.pos ? filters.pos.lng : null,
+      distanceKm: km == null ? null : Math.round(km * 10) / 10,
+      rerolls: spin.rerolls,
+      rating: null,
+      visitedAt: null,
+      updatedAt: iso(now),
+    };
+    spins.push(rec);
+    spin.record = rec;
+  }
+  saveSpins();
+}
+
+function nextSpinId() {
+  let max = 0;
+  for (const r of spins) {
+    const m = /^spin_(\d+)$/.exec(r.id || "");
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return "spin_" + String(max + 1).padStart(4, "0");
+}
+
+/* Local time with the real offset — the record has to say when he stood
+   there, not what UTC thought. */
+function iso(d) {
+  const pad = (n) => String(Math.abs(n)).padStart(2, "0");
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? "+" : "-";
+  return (
+    d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+    "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) +
+    sign + pad(Math.floor(Math.abs(off) / 60)) + ":" + pad(Math.abs(off) % 60)
+  );
+}
+
+/* ============================================================== screens */
+
+let pickMode = null; // "position" | "manual" — the map is waiting for a tap
+
+function showScreen(id) {
+  for (const s of document.querySelectorAll(".screen")) s.classList.remove("on");
+  if (id) $(id).classList.add("on");
+}
+const anyScreenOpen = () => !!document.querySelector(".screen.on");
+
+function toast(msg, ms) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("on"), ms || 2600);
+}
+
+/* --------------------------------------------------------------- dialog */
+function dialog(opts) {
+  $("dtitle").textContent = opts.title || "";
+  $("dbody").innerHTML = opts.body || "";
+  $("dbox").className = "box" + (opts.warn ? " warn" : "");
+  const btns = $("dbtns");
+  btns.innerHTML = "";
+  for (const b of opts.buttons || [{ label: "ок" }]) {
+    const el = document.createElement("button");
+    el.className = "btn" + (b.primary ? " primary" : "");
+    el.textContent = b.label;
+    el.onclick = () => {
+      $("dialog").classList.remove("on");
+      if (b.onClick) b.onClick();
+    };
+    btns.appendChild(el);
+  }
+  $("dialog").classList.add("on");
+}
+
+/* ------------------------------------------------------------- screen A */
+
+function buildScreenA() {
+  const rc = $("radiusChips");
+  rc.innerHTML = "";
+  for (const r of RADII) {
+    const b = document.createElement("button");
+    b.className = "chip" + (filters.radius === r.km ? " on" : "");
+    b.textContent = r.label;
+    b.onclick = () => {
+      filters.radius = r.km;
+      if (r.km > 0 && !filters.pos) {
+        toast("сначала отметь, где ты стоишь");
+      }
+      saveFilters();
+      buildScreenA();
+      refreshPool();
+    };
+    rc.appendChild(b);
+  }
+
+  const cc = $("catChips");
+  cc.innerHTML = "";
+  const counts = categoryCounts();
+  for (const c of CATEGORIES) {
+    const on = filters.cats.includes(c.id);
+    const b = document.createElement("button");
+    b.className = "chip" + (on ? " on" : "");
+    b.innerHTML = "";
+    b.appendChild(document.createTextNode(c.ru || c.en || c.id));
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = counts.get(c.id) || 0;
+    b.appendChild(n);
+    b.onclick = () => {
+      toggle(filters.cats, c.id);
+      saveFilters();
+      buildScreenA();
+      refreshPool();
+    };
+    cc.appendChild(b);
+  }
+
+  const dc = $("distChips");
+  dc.innerHTML = "";
+  for (const d of DISTRICTS) {
+    const on = filters.dists.includes(d.name);
+    const b = document.createElement("button");
+    b.className = "chip" + (on ? " on" : "");
+    b.textContent = d.name;
+    b.onclick = () => {
+      toggle(filters.dists, d.name);
+      saveFilters();
+      buildScreenA();
+      refreshPool();
+    };
+    dc.appendChild(b);
+  }
+
+  $("posInfo").textContent = filters.pos
+    ? "позиция: " + filters.pos.lat.toFixed(4) + ", " + filters.pos.lng.toFixed(4)
+    : "позиция не задана — радиус не применяется";
+  $("bGps").style.display = navigator.geolocation ? "" : "none";
+  updateCount();
+}
+
+function toggle(arr, value) {
+  const i = arr.indexOf(value);
+  if (i < 0) arr.push(value);
+  else arr.splice(i, 1);
+}
+
+function categoryCounts() {
+  const m = new Map();
+  for (let i = 0; i < V.n; i++) {
+    if (S.visited[i]) continue;
+    m.set(V.cat[i], (m.get(V.cat[i]) || 0) + 1);
+  }
+  return m;
+}
+
+function updateCount() {
+  const n = pool.length;
+  const line = $("countline");
+  line.textContent = n === 0 ? "ни одного" : String(n);
+  line.classList.toggle("zero", n === 0);
+  $("counthint").textContent = n === 0
+    ? "ослабь фильтр — крутить нечего"
+    : plural(n, "место подходит", "места подходят", "мест подходит");
+  $("aSpin").disabled = n === 0;
+}
+
+/* ------------------------------------------------------------- screen C */
+
+let ratingTarget = null; // the record being rated or edited
+let ratingFrom = "map";  // where "назад" should return to
+let draft = { stops: null, fromTheAirport: false, nerve: null };
+
+function buildScales() {
+  const ss = $("stopsScale");
+  ss.innerHTML = "";
+  for (let i = 0; i <= 15; i++) {
+    const b = document.createElement("b");
+    b.textContent = i;
+    if (i === 0) b.classList.add("zero");
+    b.onclick = () => { draft.stops = i; paintScales(); };
+    ss.appendChild(b);
+  }
+  const ns = $("nerveScale");
+  ns.innerHTML = "";
+  const labels = ["1", "2", "3", "4", "5"];
+  for (let i = 1; i <= 5; i++) {
+    const b = document.createElement("b");
+    b.textContent = labels[i - 1];
+    b.onclick = () => { draft.nerve = i; paintScales(); };
+    ns.appendChild(b);
+  }
+}
+
+function paintScales() {
+  const ss = $("stopsScale").children;
+  for (let i = 0; i < ss.length; i++) ss[i].classList.toggle("on", draft.stops === i);
+  const ns = $("nerveScale").children;
+  for (let i = 0; i < ns.length; i++) ns[i].classList.toggle("on", draft.nerve === i + 1);
+  $("cAirport").classList.toggle("on", !!draft.fromTheAirport);
+}
+
+function openRating(record, from) {
+  ratingFrom = from || "map";
+  if (!record) {
+    toast("сначала крутани — оценивать нечего");
+    return;
+  }
+  ratingTarget = record;
+  const p = record.place || {};
+  const latin = p.nameLatin || (hasCJK(p.name) ? "" : p.name);
+  $("cName").textContent = latin || p.name || "";
+  const gcj = wgsToGcj(p.lat, p.lng);
+  $("cMeta").innerHTML =
+    (hasCJK(p.name) ? p.name + "  ·  " : "") +
+    (CAT_LABEL.get(p.category) || p.category || "") + "  ·  " + (p.district || "") +
+    "<br>WGS-84 " + p.lat.toFixed(5) + " " + p.lng.toFixed(5) +
+    "<br>GCJ-02 " + gcj[0].toFixed(5) + " " + gcj[1].toFixed(5) + " — для 高德 / Baidu";
+
+  const r = record.rating;
+  draft = r
+    ? { stops: r.stops, fromTheAirport: !!r.fromTheAirport, nerve: r.nerve }
+    : { stops: null, fromTheAirport: false, nerve: null };
+  $("cPrice").value = r && typeof r.pricePerPerson === "number" ? r.pricePerPerson : "";
+  $("cDelete").style.display = isRated(record) ? "" : "none";
+  paintScales();
+  showScreen("screenC");
+}
+
+function saveRating() {
+  if (!ratingTarget) return;
+  if (draft.stops == null) { toast("сколько остановок это стоит?"); return; }
+  if (draft.nerve == null) { toast("оцени нерв — от 1 до 5"); return; }
+  const price = parseInt($("cPrice").value, 10);
+  const now = new Date();
+  ratingTarget.rating = {
+    stops: draft.stops,
+    fromTheAirport: !!draft.fromTheAirport,
+    pricePerPerson: isNaN(price) ? 0 : Math.max(0, price),
+    nerve: draft.nerve,
+  };
+  if (!ratingTarget.visitedAt) ratingTarget.visitedAt = iso(now);
+  ratingTarget.updatedAt = iso(now);
+  saveSpins();
+
+  // Editing an old record from the archive must not tear down the result
+  // that is currently on the map. Only finishing the pending spin does that.
+  const wasPending = spin.record === ratingTarget;
+  if (wasPending) {
+    spin.record = null;
+    // back to idle before the pool is rebuilt, so the extinguished field is
+    // relit rather than left dark under the next spin
+    spin.phase = "idle";
+    spin.winner = -1;
+    spin.lockedAt = null;
+    spin.finalists = [];
+    spin.tapPoint = null;
+    streetLabels = [];
+    hideResult();
+  }
+  refreshPool();
+  buildScreenA();
+  if (ratingFrom === "archive") {
+    buildArchive();
+    showScreen("screenD");
+  } else {
+    showScreen(null);
+    setPrompt("коснись, чтобы крутить");
+  }
+  toast("записано · " + visitedRecords().length + " " +
+    plural(visitedRecords().length, "место", "места", "мест") + " в каталоге");
+}
+
+/* Nothing deletes a rating without a confirmation step. CLAUDE.md. */
+function deleteRating() {
+  if (!ratingTarget) return;
+  const name = (ratingTarget.place && (ratingTarget.place.nameLatin || ratingTarget.place.name)) || "это место";
+  dialog({
+    warn: true,
+    title: "Удалить оценку?",
+    body: name + " вернётся в барабан, а поездка исчезнет из каталога. Это нельзя отменить.",
+    buttons: [
+      { label: "оставить" },
+      {
+        label: "удалить", primary: true,
+        onClick: () => {
+          spins = spins.filter((r) => r !== ratingTarget);
+          saveSpins();
+          ratingTarget = null;
+          refreshPool();
+          buildArchive();
+          showScreen("screenD");
+          toast("удалено");
+        },
+      },
+    ],
+  });
+}
+
+/* ------------------------------------------------------------- screen D */
+
+function buildArchive() {
+  const q = ($("dSearch").value || "").trim().toLowerCase();
+  const list = visitedRecords()
+    .slice()
+    .sort((a, b) => String(b.visitedAt || "").localeCompare(String(a.visitedAt || "")));
+  const shown = q
+    ? list.filter((r) => {
+        const p = r.place || {};
+        return ((p.name || "") + " " + (p.nameLatin || "") + " " + (p.district || "")).toLowerCase().includes(q);
+      })
+    : list;
+
+  $("dCount").textContent = list.length + " " + plural(list.length, "место", "места", "мест") + " в каталоге";
+  const box = $("arclist");
+  box.innerHTML = "";
+
+  if (!shown.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = q ? "ничего не нашлось" : "каталог пуст.\nпервая звезда появится после первой оценки.";
+    box.appendChild(e);
+    return;
+  }
+
+  shown.forEach((r) => {
+    const p = r.place || {};
+    const row = document.createElement("div");
+    row.className = "arcitem";
+    const no = document.createElement("div");
+    no.className = "no";
+    no.textContent = String(list.length - list.indexOf(r)).padStart(3, "0");
+    const nm = document.createElement("div");
+    nm.className = "nm";
+    nm.textContent = p.nameLatin || p.name || "";
+    if (hasCJK(p.name) && p.name !== p.nameLatin) {
+      const zh = document.createElement("span");
+      zh.className = "zh";
+      zh.textContent = p.name;
+      nm.appendChild(zh);
+    }
+    const st = document.createElement("div");
+    st.className = "st" + (r.rating.stops === 0 ? " skip" : "");
+    st.textContent = r.rating.stops === 0 ? "мимо" : r.rating.stops + " ост.";
+    row.append(no, nm, st);
+    row.onclick = () => openRating(r, "archive");
+    box.appendChild(row);
+  });
+}
+
+/* ------------------------------------------------- screen M — manual add */
+
+let manualPos = null;
+
+function buildManualForm() {
+  const c = $("mCat");
+  c.innerHTML = "";
+  for (const cat of CATEGORIES) {
+    const o = document.createElement("option");
+    o.value = cat.id;
+    o.textContent = cat.ru || cat.en || cat.id;
+    c.appendChild(o);
+  }
+  const d = $("mDist");
+  d.innerHTML = "";
+  for (const dist of DISTRICTS) {
+    const o = document.createElement("option");
+    o.value = dist.name;
+    o.textContent = dist.name;
+    d.appendChild(o);
+  }
+  $("mName").value = "";
+  $("mZh").value = "";
+  manualPos = null;
+  $("mPos").textContent = "не задана";
+}
+
+function saveManualPlace() {
+  const name = $("mZh").value.trim() || $("mName").value.trim();
+  const latin = $("mName").value.trim();
+  if (!name) { toast("нужно название"); return; }
+  if (!manualPos) { toast("отметь точку на карте"); return; }
+  const rec = {
+    id: "manual:" + Date.now().toString(36) + ":" + Math.floor(Math.random() * 1e6).toString(36),
+    name,
+    nameLatin: latin && latin !== name ? latin : null,
+    category: $("mCat").value,
+    district: $("mDist").value,
+    lat: Math.round(manualPos.lat * 1e5) / 1e5,
+    lng: Math.round(manualPos.lng * 1e5) / 1e5,
+    source: "manual",
+  };
+  manual.push(rec);
+  saveManual();
+  rebuildWorld();
+  toast("добавлено — участвует в следующих раскрутках");
+  showScreen("screenD");
+}
+
+/* Rebuilding the venue table also rebuilds the constellations, so a manual
+   place joins the pattern instead of floating unconnected. */
+function rebuildWorld() {
+  buildVenueTable(manual);
+  reindex();
+  allocStarState();
+  buildConstellations();
+  refreshPool();
+  buildScreenA();
+}
+
+/* ========================================================= export/import
+   The guide site reads places.json directly. Field names are load-bearing:
+   if one has to change, bump the version. SPEC 6.4 */
+const EXPORT_VERSION = 1;
+const round5 = (n) => Math.round(n * 1e5) / 1e5;
+
+function flatPlace(r) {
+  const p = r.place || {};
+  const g = wgsToGcj(p.lat, p.lng);
+  return {
+    id: p.id,
+    name: p.name,
+    nameLatin: p.nameLatin || null,
+    category: p.category,
+    district: p.district,
+    lat: p.lat,
+    lng: p.lng,
+    // WGS-84 above, GCJ-02 here. Anything that navigates in China needs the
+    // second pair; anything that maps OSM needs the first. Both, labelled.
+    latGcj: round5(g[0]),
+    lngGcj: round5(g[1]),
+    source: p.source || "osm",
+    stops: r.rating.stops,
+    fromTheAirport: !!r.rating.fromTheAirport,
+    pricePerPerson: r.rating.pricePerPerson,
+    nerve: r.rating.nerve,
+    visitedAt: r.visitedAt,
+    spinId: r.id,
+    distanceKm: r.distanceKm,
+    rerolls: r.rerolls || 0,
+    ruleRu: r.rule ? r.rule.ru : null,
+    ruleZh: r.rule ? r.rule.zh : null,
+    updatedAt: r.updatedAt,
+  };
+}
+
+function exportPayload() {
+  return {
+    version: EXPORT_VERSION,
+    exportedAt: iso(new Date()),
+    attribution: D.attribution || "© OpenStreetMap contributors",
+    places: visitedRecords().map(flatPlace),
+  };
+}
+
+function download(filename, text, mime) {
+  try {
+    const blob = new Blob([text], { type: mime + ";charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    if (typeof a.download === "undefined") throw new Error("no download attribute");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 4000);
+    toast("сохранено: " + filename);
+  } catch (e) {
+    // Safari under file:// can refuse the download. Never lose the export:
+    // put it on screen so it can be selected and sent by hand.
+    dialog({
+      title: "Скачивание не сработало",
+      body:
+        "Скопируй текст и отправь его себе — данные не потеряны.<br><br>" +
+        '<textarea class="field" style="height:38vh;font-size:11px" readonly>' +
+        text.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])) +
+        "</textarea>",
+      buttons: [{ label: "закрыть", primary: true }],
+    });
+  }
+}
+
+function exportJson() {
+  const places = visitedRecords();
+  if (!places.length) { toast("каталог пуст — нечего выгружать"); return; }
+  download("places.json", JSON.stringify(exportPayload(), null, 2), "application/json");
+}
+
+function exportCsv() {
+  const rows = visitedRecords().map(flatPlace);
+  if (!rows.length) { toast("каталог пуст — нечего выгружать"); return; }
+  const cols = Object.keys(rows[0]);
+  const esc = (v) => {
+    if (v == null) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const csv = [cols.join(",")]
+    .concat(rows.map((r) => cols.map((c) => esc(r[c])).join(",")))
+    .join("\n");
+  // BOM so Excel opens the Chinese names correctly instead of mojibake
+  download("places.csv", "﻿" + csv, "text/csv");
+}
+
+/* Shanghai is +08:00 and the editor is on European time, so these strings
+   carry different offsets and cannot be compared as text. */
+function newerThan(a, b) {
+  const ta = Date.parse(a || "");
+  const tb = Date.parse(b || "");
+  if (isNaN(ta)) return false;
+  if (isNaN(tb)) return true;
+  return ta > tb;
+}
+
+/* Merge by id, newest updatedAt wins. This is how the iPad recovers from a
+   wipe and how the editor pushes corrections back. SPEC 5. */
+function importJson(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    dialog({ warn: true, title: "Файл не читается", body: "Это не places.json." });
+    return;
+  }
+  const places = data && data.places;
+  if (!Array.isArray(places)) {
+    dialog({ warn: true, title: "Файл не читается", body: "В файле нет списка places." });
+    return;
+  }
+
+  let added = 0, updated = 0, skipped = 0, manualAdded = 0;
+  for (const p of places) {
+    if (!p || !p.id) { skipped++; continue; }
+
+    // a manually added venue has to exist in the table again, or the place
+    // it names can never be spun for a second time
+    if (p.source === "manual" && !manual.some((m) => m.id === p.id)) {
+      manual.push({
+        id: p.id, name: p.name, nameLatin: p.nameLatin || null,
+        category: p.category, district: p.district,
+        lat: p.lat, lng: p.lng, source: "manual",
+      });
+      manualAdded++;
+    }
+
+    const existing = spins.find((r) => r.placeId === p.id);
+    const rating = {
+      stops: p.stops, fromTheAirport: !!p.fromTheAirport,
+      pricePerPerson: p.pricePerPerson, nerve: p.nerve,
+    };
+    if (!existing) {
+      spins.push({
+        id: p.spinId || nextSpinId(),
+        placeId: p.id,
+        place: {
+          id: p.id, name: p.name, nameLatin: p.nameLatin || null,
+          category: p.category, district: p.district,
+          lat: p.lat, lng: p.lng, source: p.source || "osm",
+        },
+        rule: p.ruleRu || p.ruleZh ? { ru: p.ruleRu, zh: p.ruleZh } : null,
+        spunAt: p.visitedAt || null,
+        fromLat: null, fromLng: null,
+        distanceKm: p.distanceKm == null ? null : p.distanceKm,
+        rerolls: p.rerolls || 0,
+        rating,
+        visitedAt: p.visitedAt || null,
+        updatedAt: p.updatedAt || iso(new Date()),
+      });
+      added++;
+    } else if (newerThan(p.updatedAt, existing.updatedAt)) {
+      existing.rating = rating;
+      existing.visitedAt = p.visitedAt || existing.visitedAt;
+      existing.updatedAt = p.updatedAt;
+      if (p.ruleRu || p.ruleZh) existing.rule = { ru: p.ruleRu, zh: p.ruleZh };
+      updated++;
+    } else {
+      skipped++;
+    }
+  }
+
+  saveSpins();
+  if (manualAdded) saveManual();
+  rebuildWorld();
+  buildArchive();
+  dialog({
+    title: "Импорт закончен",
+    body: `добавлено ${added}<br>обновлено ${updated}<br>без изменений ${skipped}` +
+      (manualAdded ? `<br>своих мест восстановлено ${manualAdded}` : ""),
+  });
+}
+
+/* ============================================================== gestures
+   One finger pans, two pinch. A tap that did not move is the spin. */
+const TAP_SLOP = 12;
+const TAP_MS = 450;
+let g = { active: false, moved: false, startT: 0, x: 0, y: 0, lx: 0, ly: 0, pinch: 0, pinchScale: 1 };
+
+function pointFrom(e) {
+  const t = e.touches && e.touches[0];
+  return t ? { x: t.clientX, y: t.clientY } : { x: e.clientX, y: e.clientY };
+}
+
+function onStart(e) {
+  if (anyScreenOpen() || $("dialog").classList.contains("on")) return;
+  const p = pointFrom(e);
+  g.active = true;
+  g.moved = false;
+  g.startT = performance.now();
+  g.x = g.lx = p.x;
+  g.y = g.ly = p.y;
+  if (e.touches && e.touches.length === 2) {
+    g.pinch = touchDist(e);
+    g.pinchScale = view.s;
+  }
+}
+
+function touchDist(e) {
+  const [a, b] = [e.touches[0], e.touches[1]];
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
+
+function onMove(e) {
+  if (!g.active) return;
+  e.preventDefault();
+  if (e.touches && e.touches.length === 2) {
+    const d = touchDist(e);
+    if (g.pinch === 0) {          // second finger arrived mid-drag
+      g.pinch = d;
+      g.pinchScale = view.s;
+    }
+    if (g.pinch > 0) {
+      const mid = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+      zoomAround(mid.x, mid.y, (g.pinchScale * d) / g.pinch / view.s);
+    }
+    g.moved = true;
+    return;
+  }
+  const p = pointFrom(e);
+  const dx = p.x - g.lx, dy = p.y - g.ly;
+  if (Math.hypot(p.x - g.x, p.y - g.y) > TAP_SLOP) g.moved = true;
+  if (g.moved) {
+    view.x -= dx / view.s;
+    view.y -= dy / view.s;
+    target.x = view.x; target.y = view.y;
+    focus.on = false;
+    springing = false;
+  }
+  g.lx = p.x; g.ly = p.y;
+}
+
+function onEnd(e) {
+  if (!g.active) return;
+  g.active = false;
+  g.pinch = 0;
+  const dt = performance.now() - g.startT;
+  if (!g.moved && dt < TAP_MS) handleTap(g.x, g.y);
+}
+
+function zoomAround(px, py, factor) {
+  const wx = unx(px), wy = uny(py);
+  const s = Math.max(1200, Math.min(view.s * factor, 400000));
+  focus.on = false;
+  view.s = s; target.s = s;
+  view.x = wx - (px - W / 2) / s;
+  view.y = wy - (py - H / 2) / s;
+  target.x = view.x; target.y = view.y;
+  springing = false;
+}
+
+function handleTap(px, py) {
+  audio.ensure(); // the AudioContext has to be born inside a gesture
+
+  if (pickMode) {
+    const lat = INV_LAT(uny(py)), lng = INV_LNG(unx(px));
+    if (pickMode === "position") {
+      filters.pos = { lat: round5(lat), lng: round5(lng) };
+      saveFilters();
+      pickMode = null;
+      refreshPool();
+      buildScreenA();
+      showScreen("screenA");
+      setPrompt(spin.phase === "idle" ? "коснись, чтобы крутить" : "");
+    } else {
+      manualPos = { lat: round5(lat), lng: round5(lng) };
+      $("mPos").textContent = manualPos.lat.toFixed(5) + ", " + manualPos.lng.toFixed(5);
+      pickMode = null;
+      showScreen("screenM");
+      setPrompt(spin.phase === "idle" ? "коснись, чтобы крутить" : "");
+    }
+    return;
+  }
+
+  if (spin.phase === "resting") {
+    // A re-roll exists only behind an explicit confirm, and it is logged.
+    dialog({
+      warn: true,
+      title: "Перекрутить?",
+      body: "Место сменится, а счётчик перекруток вырастет и останется в записи — его видно на экране.",
+      buttons: [
+        { label: "оставить как есть" },
+        {
+          label: "перекрутить", primary: true,
+          onClick: () => {
+            const rejected = spin.winner;
+            const p = refreshPool().filter((i) => i !== rejected);
+            if (!p.length) { toast("крутить больше нечего"); return; }
+            spin.start(p, true);
+          },
+        },
+      ],
+    });
+    return;
+  }
+
+  if (spin.canStart()) {
+    const p = refreshPool();
+    if (!p.length) {
+      toast("ни одного места — ослабь фильтр");
+      return;
+    }
+    spin.tapPoint = [px, py];
+    spin.start(p, false);
+  }
+  // mid-spin taps are ignored on purpose: nothing can interrupt the take
+}
+
+/* ============================================================== wiring */
+
+function bind() {
+  cv.addEventListener("touchstart", onStart, { passive: false });
+  cv.addEventListener("touchmove", onMove, { passive: false });
+  cv.addEventListener("touchend", onEnd, { passive: false });
+  cv.addEventListener("touchcancel", () => { g.active = false; }, { passive: false });
+  cv.addEventListener("mousedown", onStart);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onEnd);
+  cv.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0016));
+  }, { passive: false });
+  // stop Safari's own pinch-zoom from fighting the map
+  document.addEventListener("gesturestart", (e) => e.preventDefault());
+  document.addEventListener("gesturechange", (e) => e.preventDefault());
+
+  window.addEventListener("resize", () => { resize(); });
+  window.addEventListener("orientationchange", () => setTimeout(resize, 250));
+
+  $("bSetup").onclick = () => { refreshPool(); buildScreenA(); showScreen("screenA"); };
+  $("aClose").onclick = () => showScreen(null);
+  $("aSpin").onclick = () => {
+    showScreen(null);
+    setPrompt("коснись, чтобы крутить");
+  };
+  $("bArchive").onclick = () => { buildArchive(); showScreen("screenD"); };
+  $("dClose").onclick = () => showScreen(null);
+  $("bRate").onclick = () => openRating(spin.record || lastUnrated(), "map");
+  $("bGuide").onclick = () => $("guide").classList.toggle("on");
+  $("bHide").onclick = () => document.body.classList.toggle("hideui");
+  $("bHelp").onclick = showHelp;
+  $("bOutro").onclick = playOutro;
+
+  $("bPickHere").onclick = () => {
+    pickMode = "position";
+    showScreen(null);
+    setPrompt("коснись карты — там, где ты стоишь");
+  };
+
+  /* GPS is an enhancement, never the path. It does not work over file:// in
+     iOS Safari at all, so it must never block and never raise a dialog.
+     CLAUDE.md, known traps. */
+  $("bGps").onclick = () => {
+    if (!navigator.geolocation) { toast("gps недоступен — отметь вручную"); return; }
+    toast("ищу спутники…");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        filters.pos = { lat: round5(p.coords.latitude), lng: round5(p.coords.longitude) };
+        saveFilters();
+        refreshPool();
+        buildScreenA();
+        toast("позиция с gps");
+      },
+      () => { toast("gps не ответил — отметь вручную"); },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  };
+
+  $("catAll").onclick = () => {
+    filters.cats = filters.cats.length === CATEGORIES.length ? [] : CATEGORIES.map((c) => c.id);
+    saveFilters(); buildScreenA(); refreshPool();
+  };
+  $("distAll").onclick = () => {
+    filters.dists = filters.dists.length === DISTRICTS.length ? [] : DISTRICTS.map((d) => d.name);
+    saveFilters(); buildScreenA(); refreshPool();
+  };
+
+  $("cClose").onclick = () => {
+    if (ratingFrom === "archive") { buildArchive(); showScreen("screenD"); }
+    else showScreen(null);
+  };
+  $("cSave").onclick = saveRating;
+  $("cDelete").onclick = deleteRating;
+  $("cAirport").onclick = () => { draft.fromTheAirport = !draft.fromTheAirport; paintScales(); };
+
+  $("dSearch").oninput = buildArchive;
+  $("dAdd").onclick = () => { buildManualForm(); showScreen("screenM"); };
+  $("dJson").onclick = exportJson;
+  $("dCsv").onclick = exportCsv;
+  $("dImport").onclick = () => $("dFile").click();
+  $("dFile").onchange = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => importJson(String(fr.result));
+    fr.onerror = () => dialog({ warn: true, title: "Файл не открылся", body: "Попробуй ещё раз." });
+    fr.readAsText(f);
+    e.target.value = "";
+  };
+
+  $("mClose").onclick = () => showScreen("screenD");
+  $("mSave").onclick = saveManualPlace;
+  $("mPick").onclick = () => {
+    pickMode = "manual";
+    showScreen(null);
+    setPrompt("коснись карты — где это место");
+  };
+}
+
+function lastUnrated() {
+  for (let i = spins.length - 1; i >= 0; i--) if (!isRated(spins[i])) return spins[i];
+  return null;
+}
+
+/* The outro. Three seconds at the end of every video: pull back to the whole
+   city, the new star joins the pattern, and the count says how far it has
+   got. This is why a viewer watches to the end. DESIGN.md §8 */
+const TARGET_PLACES = 500;
+function playOutro() {
+  hideResult();
+  setPrompt("");
+  cityView(true);
+  const n = visitedRecords().length;
+  const o = $("outro");
+  o.textContent = String(n).padStart(3, "0") + " / " + TARGET_PLACES;
+  o.classList.add("on");
+  clearTimeout(playOutro._t);
+  playOutro._t = setTimeout(() => o.classList.remove("on"), 6000);
+}
+
+/* The whole city, fitted to the screen. Also the floor for every other
+   camera move: nothing in the sequence should ever be tighter than this. */
+function cityFitScale() {
+  return Math.min(W / (WX(BBOX[3]) - WX(BBOX[1])), H / (WY(BBOX[0]) - WY(BBOX[2])));
+}
+
+function cityView(animate) {
+  const x0 = WX(BBOX[1]), x1 = WX(BBOX[3]);
+  const y0 = WY(BBOX[2]), y1 = WY(BBOX[0]);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const s = cityFitScale() * 0.94;
+  if (animate) springTo(cx, cy, s);
+  else jumpTo(cx, cy, s);
+}
+
+function showHelp() {
+  const n = visitedRecords().length;
+  dialog({
+    title: "Перед съёмкой",
+    body:
+      '<div class="help">' +
+      "<b>Яркость на максимум.</b> Night Shift и True Tone — выключить, иначе цвет уплывёт между дублями.<br>" +
+      "<b>Одним дублем.</b> Часы в углу идут всё время — это и есть доказательство честности.<br>" +
+      "<b>9:16</b> показывает, что попадёт в кадр. Весь текст результата — между линиями.<br>" +
+      "<b>Скрыть</b> убирает кнопки. Вернуть — той же кнопкой в левом нижнем углу.<br>" +
+      "<b>Перекрутка</b> спрашивает подтверждение и остаётся в записи.<br>" +
+      "<hr>" +
+      "координаты на экране — WGS-84 (osm).<br>" +
+      "для 高德 и Baidu нужен GCJ-02 — он на экране оценки, отличается на 300–600 м.<br>" +
+      "<hr>" +
+      "в каталоге " + n + " " + plural(n, "место", "места", "мест") + ".<br>" +
+      "приложение работает полностью офлайн.<br>" +
+      (location.protocol.startsWith("http")
+        ? (offlineReady
+            ? "<b>офлайн-копия на устройстве: есть.</b> интернет больше не нужен.<br>"
+            : "офлайн-копия ещё не сохранена — побудь в сети пару секунд.<br>")
+        : "") +
+      (store.live ? "" : "<b>внимание: браузер не даёт сохранять на диск. оценки живут только до перезагрузки — выгрузи их сразу.</b><br>") +
+      "<hr>" +
+      "карта: " + (D.attribution || "© OpenStreetMap contributors") + "<br>" +
+      "данные собраны " + (D.builtAt || "—") +
+      "</div>",
+    buttons: [{ label: "понял", primary: true }],
+  });
+}
+
+/* ------------------------------------------------------- offline install
+   Served from a domain once, then copied onto the device and answered from
+   that copy forever after. Over file:// there is nothing to install and the
+   app already is the copy, so this is skipped entirely. */
+let offlineReady = false;
+
+function installOfflineCopy() {
+  if (!location.protocol.startsWith("http")) return;   // file:// — nothing to do
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+    navigator.serviceWorker.ready.then(() => {
+      // give the precache a moment to finish, then confirm it really landed
+      setTimeout(checkOfflineCopy, 1500);
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+async function checkOfflineCopy() {
+  try {
+    if (!("caches" in window)) return;
+    for (const key of await caches.keys()) {
+      const c = await caches.open(key);
+      if (await c.match("./data/shanghai.js") || await c.match("data/shanghai.js")) {
+        const first = !offlineReady;
+        offlineReady = true;
+        // Tell him once, plainly: it is safe to walk away from the network.
+        if (first) toast("копия сохранена — работает без интернета", 5000);
+        return;
+      }
+    }
+  } catch (e) {}
+}
+
+/* --------------------------------------------------------------- clock */
+function tickClock() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  $("clock").textContent = p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+}
+
+/* ---------------------------------------------------------------- init */
+function init() {
+  resize();
+  buildVenueTable(manual);
+  reindex();
+  allocStarState();
+  buildConstellations();
+  cityView(false);
+  buildScales();
+  refreshPool();
+  buildScreenA();
+  bind();
+
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  setPrompt("коснись, чтобы крутить");
+  requestAnimationFrame(frame);
+
+  // everything above worked: take the "no scripts" banner down
+  const banner = $("nojs");
+  if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+
+  if (!store.live) {
+    toast("сохранение недоступно — выгружай оценки сразу", 8000);
+  }
+  installOfflineCopy();
+  // first run: the filter screen explains itself better than a tour does
+  if (!spins.length && !filters.pos) {
+    setTimeout(() => { refreshPool(); buildScreenA(); showScreen("screenA"); }, 400);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
