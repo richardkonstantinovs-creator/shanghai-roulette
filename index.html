@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Шанхайская рулетка</title>
+<title>Shanghai Roulette</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Рулетка">
+<meta name="apple-mobile-web-app-title" content="Roulette">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="color-scheme" content="dark">
@@ -190,29 +190,63 @@ body.hideui .corner,body.hideui #prompt{display:none;}
   font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.32em;
   text-transform:uppercase;color:var(--engrave);opacity:.6;margin-bottom:10px;
 }
-.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chips{display:flex;flex-wrap:wrap;gap:10px;}
 .chip{
   font-family:var(--utility);font-size:12px;font-weight:700;letter-spacing:.12em;
   text-transform:uppercase;color:var(--engrave);
   background:transparent;border:3px solid rgba(127,169,196,.2);
-  padding:11px 13px;min-height:44px;cursor:pointer;
+  padding:13px 15px;min-height:48px;cursor:pointer;
+  display:inline-flex;align-items:center;
 }
+.chip:active{border-color:rgba(240,226,200,.4);}
 .chip.on{color:var(--rubbing);border-color:rgba(240,226,200,.55);background:rgba(240,226,200,.06);}
-.chip .n{opacity:.45;margin-left:8px;font-weight:500;}
+/* an unselected chip that still has nothing behind it is not worth a tap.
+   Not ".empty" — that name is already the archive's empty-state block, and
+   an unqualified class later in this sheet wins the font off the chip. */
+.chip.nil{opacity:.34;}
+.chip .n{opacity:.45;margin-left:9px;font-weight:500;}
+/* the all / none pair — small enough to read as a control, not a choice */
+.chip.mini{padding:7px 11px;min-height:0;font-size:10px;letter-spacing:.16em;}
+
+/* the row a section label shares with its summary and its shortcuts */
+.srow{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.srow .slabel{margin-bottom:0;}
+.ssel{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.18em;
+  color:var(--rubbing);opacity:.72;margin-right:auto;white-space:nowrap;
+}
+.ssel.warn{color:var(--nova);opacity:1;}
+.hsub.warnline{color:var(--nova);opacity:.95;}
+
+/* only the middle of the filter screen scrolls; the count stays in reach.
+   The negative margin lets the scrollbar and the tap targets run to the
+   screen edge while the content keeps the screen padding. */
+.ascroll{
+  flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  margin:0 -22px;padding:0 22px;
+}
+.afoot{
+  display:flex;align-items:center;gap:16px;flex:0 0 auto;
+  padding-top:16px;margin-top:2px;
+  border-top:3px solid rgba(127,169,196,.16);
+}
+.afoot .acount{flex:1 1 auto;min-width:0;}
+.afoot .btn.primary{flex:0 0 auto;padding:20px 26px;font-size:13px;}
 
 /* the count, and the spin button that it disables */
 #countline{
-  font-family:var(--display);font-size:clamp(28px,4vw,44px);font-weight:600;
-  color:var(--rubbing);letter-spacing:-.01em;
+  font-family:var(--display);font-size:clamp(26px,3.4vw,38px);font-weight:600;
+  color:var(--rubbing);letter-spacing:-.01em;line-height:1;
 }
 #countline.zero{color:var(--nova);}
-#counthint{font-family:var(--utility);font-size:12px;letter-spacing:.18em;
-  text-transform:uppercase;opacity:.55;margin-top:8px;}
+#counthint{font-family:var(--utility);font-size:11px;letter-spacing:.18em;
+  text-transform:uppercase;opacity:.55;margin-top:7px;}
 
 .spacer{flex:1 1 auto;min-height:12px;}
 .footrow{display:flex;gap:10px;flex:0 0 auto;padding-top:18px;}
 .footrow .btn{flex:1 1 auto;text-align:center;padding:18px 14px;font-size:13px;}
 .btn.primary{color:var(--nova);border-color:var(--nova);}
+.btn.primary[disabled]{color:var(--engrave);border-color:rgba(127,169,196,.25);}
 
 /* ---------------------------------------------------------- rating scale */
 .scale{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;}
@@ -339,9 +373,9 @@ body.hideui #outro.on{display:block;}
      Files preview on iPadOS does exactly that, and the result is a dead
      screen that looks like a broken app. -->
 <div id="nojs">
-  <b>Скрипты не выполняются</b>
-  Этот просмотрщик показывает файл, но не запускает его.
-  Открой его в Safari.
+  <b>Scripts are not running</b>
+  This viewer shows the file but does not run it.
+  Open it in Safari.
   <span id="nojserr"></span>
 </div>
 
@@ -352,8 +386,8 @@ window.addEventListener("error", function (e) {
   var box = document.getElementById("nojserr");
   var head = document.querySelector("#nojs b");
   if (!box || !head) return;
-  head.textContent = "Ошибка при запуске";
-  box.textContent = (e.message || "unknown") + "  ·  строка " + (e.lineno || "?");
+  head.textContent = "Startup error";
+  box.textContent = (e.message || "unknown") + "  ·  line " + (e.lineno || "?");
   var n = document.getElementById("nojs");
   if (n) n.style.display = "flex";
 });
@@ -377,15 +411,15 @@ window.addEventListener("error", function (e) {
   <div id="rulebox"><div id="ruletext"></div><div id="rulezh"></div></div>
 </div>
 
-<div id="prompt">коснись, чтобы крутить</div>
+<div id="prompt">tap to spin</div>
 
 <!-- the outro: the sky pulls back and the catalogue says how far it has got -->
 <div id="outro"></div>
 
 <!-- controls, all four in the corners, all outside the crop -->
 <div class="corner tl">
-  <button class="btn" id="bSetup">фильтр</button>
-  <button class="btn" id="bArchive">архив</button>
+  <button class="btn" id="bSetup">filter</button>
+  <button class="btn" id="bArchive">archive</button>
 </div>
 <div class="corner tr">
   <span id="clock">--:--:--</span>
@@ -393,50 +427,75 @@ window.addEventListener("error", function (e) {
 </div>
 <div class="corner bl">
   <button class="btn" id="bGuide">9:16</button>
-  <button class="btn" id="bHide">скрыть</button>
+  <button class="btn" id="bHide">hide</button>
 </div>
 <div class="corner br">
-  <button class="btn" id="bOutro">финал</button>
-  <button class="btn warm" id="bRate">оценить</button>
+  <button class="btn" id="bOutro">outro</button>
+  <button class="btn warm" id="bRate">rate</button>
 </div>
 
-<!-- ------------------------------------------------------ A — setup ---- -->
+<!-- ------------------------------------------------------ A — setup ----
+     Header and footer are pinned; only the middle scrolls. The count and
+     the button that it disables are always in reach, so he never has to
+     scroll back down to find out whether the filter left anything to spin. -->
 <div class="screen" id="screenA">
   <div class="hrow">
     <div>
-      <div class="htitle">Шанхайская рулетка</div>
-      <div class="hsub" id="asub">фильтр</div>
+      <div class="htitle">Shanghai Roulette</div>
+      <div class="hsub" id="asub">filter</div>
     </div>
-    <button class="btn" id="aClose">карта</button>
+    <button class="btn" id="aClose">map</button>
   </div>
 
-  <div class="section">
-    <div class="slabel">радиус</div>
-    <div class="chips" id="radiusChips"></div>
-    <div class="chips" style="margin-top:8px">
-      <button class="chip" id="bPickHere">я здесь — отметить на карте</button>
-      <button class="chip" id="bGps">gps</button>
+  <div class="ascroll" id="ascroll">
+    <div class="section">
+      <div class="srow">
+        <div class="slabel">where you are</div>
+      </div>
+      <div class="chips">
+        <button class="chip" id="bPickHere">i&#39;m here — mark on the map</button>
+        <button class="chip" id="bGps">gps</button>
+        <button class="chip" id="bClearPos">clear</button>
+      </div>
+      <div class="hsub" id="posInfo" style="margin-top:10px">position not set</div>
     </div>
-    <div class="hsub" id="posInfo" style="margin-top:10px">позиция не задана</div>
+
+    <div class="section">
+      <div class="srow">
+        <div class="slabel">radius</div>
+        <span class="ssel" id="radSel"></span>
+      </div>
+      <div class="chips" id="radiusChips"></div>
+    </div>
+
+    <div class="section">
+      <div class="srow">
+        <div class="slabel">categories</div>
+        <span class="ssel" id="catSel"></span>
+        <button class="chip mini" id="catAll">all</button>
+        <button class="chip mini" id="catNone">none</button>
+      </div>
+      <div class="chips" id="catChips"></div>
+    </div>
+
+    <div class="section">
+      <div class="srow">
+        <div class="slabel">districts</div>
+        <span class="ssel" id="distSel"></span>
+        <button class="chip mini" id="distAll">all</button>
+        <button class="chip mini" id="distNone">none</button>
+      </div>
+      <div class="chips" id="distChips"></div>
+    </div>
+    <div style="height:8px"></div>
   </div>
 
-  <div class="section">
-    <div class="slabel">категории <span id="catAll" class="chip" style="padding:4px 8px;min-height:0">все</span></div>
-    <div class="chips" id="catChips"></div>
-  </div>
-
-  <div class="section">
-    <div class="slabel">районы <span id="distAll" class="chip" style="padding:4px 8px;min-height:0">все</span></div>
-    <div class="chips" id="distChips"></div>
-  </div>
-
-  <div class="spacer"></div>
-  <div style="flex:0 0 auto">
-    <div id="countline">—</div>
-    <div id="counthint">мест подходит</div>
-  </div>
-  <div class="footrow">
-    <button class="btn primary" id="aSpin">на карту</button>
+  <div class="afoot">
+    <div class="acount">
+      <div id="countline">—</div>
+      <div id="counthint">places match</div>
+    </div>
+    <button class="btn primary" id="aSpin">to the map</button>
   </div>
 </div>
 
@@ -447,31 +506,31 @@ window.addEventListener("error", function (e) {
       <div class="htitle" id="cName"></div>
       <div class="hsub" id="cMeta"></div>
     </div>
-    <button class="btn" id="cClose">назад</button>
+    <button class="btn" id="cClose">back</button>
   </div>
 
   <div class="section">
-    <div class="slabel">остановок метро <span style="opacity:.5">— 0 значит «мимо»</span></div>
+    <div class="slabel">metro stops <span style="opacity:.5">— 0 means &laquo;skip it&raquo;</span></div>
     <div class="scale" id="stopsScale"></div>
     <div class="chips" style="margin-top:8px">
-      <button class="chip" id="cAirport">стоит поездки из аэропорта</button>
+      <button class="chip" id="cAirport">worth the trip from the airport</button>
     </div>
   </div>
 
   <div class="section">
-    <div class="slabel">цена на человека, ¥</div>
+    <div class="slabel">price per person, ¥</div>
     <input class="field" id="cPrice" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0">
   </div>
 
   <div class="section">
-    <div class="slabel">нерв — язык, странность, порог</div>
+    <div class="slabel">nerve — language, strangeness, threshold</div>
     <div class="nerve" id="nerveScale"></div>
   </div>
 
   <div class="spacer"></div>
   <div class="footrow">
-    <button class="btn" id="cDelete">удалить</button>
-    <button class="btn primary" id="cSave">сохранить</button>
+    <button class="btn" id="cDelete">delete</button>
+    <button class="btn primary" id="cSave">save</button>
   </div>
 </div>
 
@@ -479,20 +538,20 @@ window.addEventListener("error", function (e) {
 <div class="screen" id="screenD">
   <div class="hrow">
     <div>
-      <div class="htitle">Каталог</div>
-      <div class="hsub" id="dCount">0 мест</div>
+      <div class="htitle">Catalogue</div>
+      <div class="hsub" id="dCount">0 places</div>
     </div>
-    <button class="btn" id="dClose">карта</button>
+    <button class="btn" id="dClose">map</button>
   </div>
   <div class="section" style="margin-top:14px">
-    <input class="field" id="dSearch" type="search" placeholder="поиск по названию">
+    <input class="field" id="dSearch" type="search" placeholder="search by name">
   </div>
   <div id="arclist"></div>
   <div class="footrow">
-    <button class="btn" id="dAdd">добавить</button>
+    <button class="btn" id="dAdd">add</button>
     <button class="btn" id="dJson">.json</button>
     <button class="btn" id="dCsv">.csv</button>
-    <button class="btn" id="dImport">импорт</button>
+    <button class="btn" id="dImport">import</button>
   </div>
   <input type="file" id="dFile" accept="application/json,.json" style="display:none">
 </div>
@@ -501,35 +560,35 @@ window.addEventListener("error", function (e) {
 <div class="screen scroll" id="screenM">
   <div class="hrow">
     <div>
-      <div class="htitle">Своё место</div>
-      <div class="hsub">которого нет в osm</div>
+      <div class="htitle">Your own place</div>
+      <div class="hsub">not in osm</div>
     </div>
-    <button class="btn" id="mClose">назад</button>
+    <button class="btn" id="mClose">back</button>
   </div>
   <div class="section">
-    <div class="slabel">название</div>
+    <div class="slabel">name</div>
     <input class="field" id="mName" type="text" placeholder="Lao Chen Noodles">
   </div>
   <div class="section">
-    <div class="slabel">по-китайски</div>
+    <div class="slabel">in chinese</div>
     <input class="field" id="mZh" type="text" placeholder="老陈面馆">
   </div>
   <div class="section">
-    <div class="slabel">категория</div>
+    <div class="slabel">category</div>
     <select class="field" id="mCat"></select>
   </div>
   <div class="section">
-    <div class="slabel">район</div>
+    <div class="slabel">district</div>
     <select class="field" id="mDist"></select>
   </div>
   <div class="section">
-    <div class="slabel">位置 — точка на карте</div>
-    <button class="btn wide" id="mPick">отметить на карте</button>
-    <div class="hsub" id="mPos" style="margin-top:10px">не задана</div>
+    <div class="slabel">位置 — point on the map</div>
+    <button class="btn wide" id="mPick">mark it on the map</button>
+    <div class="hsub" id="mPos" style="margin-top:10px">not set</div>
   </div>
   <div class="spacer"></div>
   <div class="footrow">
-    <button class="btn primary" id="mSave">сохранить</button>
+    <button class="btn primary" id="mSave">save</button>
   </div>
 </div>
 
@@ -554,8 +613,8 @@ const $ = (id) => document.getElementById(id);
 
 if (!D || !D.venues) {
   document.body.innerHTML =
-    '<div class="empty" style="padding-top:30vh">data/shanghai.js не загрузился.<br>' +
-    'Оба файла — index.html и папка data — должны лежать рядом.</div>';
+    '<div class="empty" style="padding-top:30vh">data/shanghai.js did not load.<br>' +
+    'index.html and the data folder must sit side by side.</div>';
   throw new Error("SH_DATA missing");
 }
 
@@ -725,9 +784,9 @@ const CI = { id: VS.indexOf("id"), name: VS.indexOf("name"), latin: VS.indexOf("
   cat: VS.indexOf("category"), dist: VS.indexOf("district"),
   lat: VS.indexOf("lat"), lng: VS.indexOf("lng") };
 
-const CATEGORIES = (D.categories || []).map((c) => (typeof c === "string" ? { id: c, ru: c, en: c } : c));
+const CATEGORIES = (D.categories || []).map((c) => (typeof c === "string" ? { id: c, en: c } : c));
 const DISTRICTS = (D.districts || []).map((d) => (typeof d === "string" ? { name: d } : d));
-const CAT_LABEL = new Map(CATEGORIES.map((c) => [c.id, c.ru || c.en || c.id]));
+const CAT_LABEL = new Map(CATEGORIES.map((c) => [c.id, c.en || c.ru || c.id]));
 
 const V = {
   n: 0,
@@ -1220,10 +1279,25 @@ function drawStarField(g, gs, t) {
     }
     if (spin.phase === "closing" && spin.finalists.includes(i)) {
       // By now they are the only three stars left on the whole chart, and
-      // they light in turn. Breathing and the wide-zoom dimming would leave
-      // them fainter than the roads, so the survivors are driven, not scaled.
+      // the light walks between them. Breathing and the wide-zoom dimming
+      // would leave them fainter than the roads, so the survivors are
+      // driven, not scaled.
       a = 0.95 * spin.blinkAlpha(i, t);
-      size = 22 * gs * sizeScale * 1.6;
+      // Three finalists spread across the city floor the approach zoom at
+      // the city fit, where sizeScale bottoms out at 0.42 and the survivors
+      // come out smaller than the road texture. They are the only subject
+      // left on the chart by now, so they get a floor of their own.
+      const fs = Math.max(sizeScale, 0.82);
+      const bs = spin.blinkState(t);
+      if (!bs) {
+        size = 22 * gs * fs * 1.6;
+      } else {
+        // The chosen one swells hard and relaxes; the passed-over shrink.
+        // Size carries the choice at distances where alpha alone is lost in
+        // the bloom, and it is what makes the beat readable on a phone.
+        const punch = bs.lit === i ? 0.9 * (1 - clamp01(bs.u * 2.2)) : 0;
+        size = 22 * gs * fs * ((bs.lit === i ? 1.85 : 1.3) + punch);
+      }
     }
     a *= depthFade(px / gs, py / gs);
     a += spin.flare(px / gs, py / gs, t);
@@ -1289,15 +1363,22 @@ function drawConstellations(t) {
   if (spin.phase === "closing" || spin.phase === "locked" || spin.phase === "rule" || spin.phase === "resting") {
     const f = spin.finalists;
     if (f.length === 3) {
-      ctx.strokeStyle = `rgba(${RGB.engrave},${(0.6 * spin.triangleAlpha(t)).toFixed(3)})`;
+      const ta = spin.triangleAlpha(t);
+      const bs = spin.blinkState(t);
       ctx.lineWidth = 3;
-      ctx.beginPath();
+      // The two edges that touch the lit vertex carry current; the third
+      // stays dark. The triangle stops being a shape and starts being a
+      // circuit the choice is travelling around.
       for (let k = 0; k < 3; k++) {
         const a = f[k], b = f[(k + 1) % 3];
+        const live = bs && (bs.lit === a || bs.lit === b);
+        const w = bs ? (live ? 0.95 : 0.28) : 0.6;
+        ctx.strokeStyle = `rgba(${RGB.engrave},${(w * ta).toFixed(3)})`;
+        ctx.beginPath();
         ctx.moveTo(sx(V.x[a]), sy(V.y[a]));
         ctx.lineTo(sx(V.x[b]), sy(V.y[b]));
+        ctx.stroke();
       }
-      ctx.stroke();
     }
   }
 }
@@ -1438,6 +1519,67 @@ function drawStreetLabels(t) {
   ctx.textAlign = "left";
 }
 
+/* ----------------------------------------------------------- the reticle
+   A ring that slams shut on whichever finalist the light is on, plus a
+   ripple leaving the one it just left. Cool, never amber: amber appears
+   exactly twice per run, at the nova and at the rule, and spending it here
+   would cost the nova its meaning. DESIGN.md §2, §10. */
+function drawSelector(t) {
+  if (spin.phase !== "closing") return;
+  const b = spin.blinkState(t);
+  if (!b || b.lit == null || b.lit < 0) return;
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  /* Every finalist keeps a quiet ring for the whole beat. Additive light on
+     a dark field does not hold a dim star: without this the two that are not
+     currently lit read as empty space, and a choice between one visible
+     thing and two invisible ones is not a choice anybody can feel. */
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(${RGB.engrave},0.26)`;
+  for (const i of spin.finalists) {
+    if (i === b.lit) continue;
+    const qx = sx(V.x[i]), qy = sy(V.y[i]);
+    if (qx < -60 || qy < -60 || qx > W + 60 || qy > H + 60) continue;
+    ctx.beginPath();
+    ctx.arc(qx, qy, 22, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  const px = sx(V.x[b.lit]), py = sy(V.y[b.lit]);
+  if (px < -160 || py < -160 || px > W + 160 || py > H + 160) return;
+
+  const e = 1 - Math.pow(1 - clamp01(b.u * 1.9), 3);   // out-cubic, snapping
+
+  // the ring closing in — wide and faint, ending tight and solid
+  const r = 96 - 66 * e;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(${RGB.engrave},${(0.30 + 0.55 * e).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // and one leaving, so the eye reads the jump as movement, not a cut
+  const out = clamp01(b.u * 2.4);
+  if (out < 1) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(${RGB.engrave},${(0.34 * (1 - out)).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 30 + 58 * out, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // the last step earns a second, tighter ring: the choice has stopped
+  if (b.last) {
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(${RGB.engrave},${(0.5 * e).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 20 + 4 * Math.sin(t * 0.012), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 /* -------------------------------------------------------------- the grade
    Vignette, grain, and one soft-light pass that lifts the shadows toward
    blue the way a film grade does, so the dark areas do not read as dead
@@ -1497,6 +1639,7 @@ function frame(now) {
   ctx.globalCompositeOperation = "source-over";
 
   drawStarField(ctx, 1, now);
+  drawSelector(now);
   drawNova(now);
   drawStreetLabels(now);
   drawPositionMark();
@@ -1641,6 +1784,12 @@ const audio = {
     } catch (e) {}
   },
 
+  // the choosing beat: pitch climbs step by step, the opposite shape to the
+  // extinction ticks, and the last one is longer and louder — a decision
+  choose(u, last) {
+    this.blip(300 + 430 * clamp01(u), last ? 0.16 : 0.075, "triangle", last ? 0.17 : 0.11);
+  },
+
   nova() { this.sweep(120, 38, 500, 0.5); },        // felt more than heard
   ruleLock() { this.sweep(260, 96, 320, 0.32); },   // shorter, higher, a sibling
 };
@@ -1649,18 +1798,25 @@ const audio = {
    Times from the tap, in milliseconds. DESIGN.md §6. These numbers are the
    product; do not round them off.
 
-   The 0.7 s silence at 4200 is load-bearing. It turns one event into two
+   The 0.7 s silence at LOCK is load-bearing. It turns one event into two
    and is the single largest retention device in the sequence. */
 const T = {
   EXTINCT_FROM: 200,
   EXTINCT_TO: 2200,
   APPROACH_TO: 3400,
-  THREE_TO: 4200,
-  LOCK: 4200,
-  SILENCE_TO: 4900,
-  RULE_TO: 6250,
+  THREE_TO: 5200,
+  LOCK: 5200,
+  SILENCE_TO: 5900,
+  RULE_TO: 7250,
 };
-const BLINK_STEPS = [200, 250, 350]; // in turn, slowing, none under 200 ms
+/* The choosing beat. Three finalists were not enough to read as a decision
+   when each lit exactly once: the eye saw a countdown, not a choice. So the
+   light cycles the triangle several times over, decelerating, and lands on
+   the winner on the last step — where it holds long enough to be believed
+   just before the nova takes it. Nothing under 200 ms: a filmed screen
+   strobes below that. DESIGN.md §6, §9.
+   Sums to THREE_TO - APPROACH_TO. */
+const BLINK_STEPS = [200, 200, 200, 220, 250, 300, 430];
 
 /* One continuous take, and the outcome is fixed the instant he taps. */
 function secureRandom(n) {
@@ -1697,6 +1853,8 @@ const spin = {
   record: null,
   rerolls: 0,
   coordFrom: null,
+  blinkOrder: [],
+  lastBlinkK: -1,
 
   aliveFraction() {
     if (this.phase === "idle" || !this.order.length) return 1;
@@ -1714,17 +1872,34 @@ const spin = {
     return clamp01((el - T.EXTINCT_TO) / 600);
   },
 
-  blinkAlpha(i, t) {
+  /* Which finalist the light is on, and how far through its step it is.
+     null outside the choosing beat and under reduced motion. */
+  blinkState(t) {
+    if (REDUCED || !this.blinkOrder.length) return null;
     const el = t - this.t0;
-    if (el < T.APPROACH_TO) return 1;
-    if (REDUCED) return 1;
-    let acc = T.APPROACH_TO, lit = -1;
+    if (el < T.APPROACH_TO || el >= T.THREE_TO) return null;
+    let acc = T.APPROACH_TO;
     for (let k = 0; k < BLINK_STEPS.length; k++) {
-      if (el >= acc && el < acc + BLINK_STEPS[k]) { lit = k; break; }
+      if (el < acc + BLINK_STEPS[k]) {
+        return {
+          k,
+          lit: this.blinkOrder[k],
+          u: (el - acc) / BLINK_STEPS[k],
+          last: k === BLINK_STEPS.length - 1,
+        };
+      }
       acc += BLINK_STEPS[k];
     }
-    if (lit < 0) return 1;
-    return this.finalists[lit] === i ? 1.25 : 0.3;
+    return null;
+  },
+
+  blinkAlpha(i, t) {
+    const b = this.blinkState(t);
+    if (!b) return 1;
+    // The gap between chosen and passed-over has to be wide enough to read
+    // through a phone camera at arm's length. 1.25 against 0.3 did not.
+    if (b.lit !== i) return 0.46;
+    return 1.6 - 0.4 * clamp01(b.u * 1.7);    // snaps on, then settles
   },
 
   // stars flare as the tap ring passes over them
@@ -1753,6 +1928,16 @@ const spin = {
     if (this.finalists.length < 3) this.finalists = this.order.slice();
     this.winner = this.finalists[secureRandom(this.finalists.length)];
     this.rerolls = isReroll ? this.rerolls + 1 : 0;
+
+    /* The light walks the triangle one vertex per step. Offsetting the walk
+       so that the final step falls on the winner costs nothing — the winner
+       was already fixed, at the tap, from a CSP random source — and buys the
+       one thing the beat was missing: the choice visibly lands. */
+    const m = this.finalists.length;
+    const last = BLINK_STEPS.length - 1;
+    const off = (((this.finalists.indexOf(this.winner) - last) % m) + m) % m;
+    this.blinkOrder = BLINK_STEPS.map((_, k) => this.finalists[(k + off) % m]);
+    this.lastBlinkK = -1;
 
     this.t0 = performance.now();
     this.phase = "eliminating";
@@ -1804,6 +1989,16 @@ const spin = {
     }
 
     if (this.phase === "closing") {
+      const b = this.blinkState(now);
+      if (b && b.k !== this.lastBlinkK) {
+        this.lastBlinkK = b.k;
+        // rising pitch, against the falling pitch of the extinction ticks:
+        // the ear hears the countdown end and the decision begin
+        audio.choose(b.k / Math.max(1, BLINK_STEPS.length - 1), b.last);
+        // and the last three land in the hand, ramping into the nova's 12
+        const fromEnd = BLINK_STEPS.length - 1 - b.k;
+        if (fromEnd <= 2) kickShake(4 + 2 * (2 - fromEnd), 220);
+      }
       if (el >= T.LOCK) this.lock(now);
       return;
     }
@@ -1841,7 +2036,7 @@ const spin = {
         audio.ruleLock();
         kickShake(7, 340);
         wipeIn($("rulebox"));
-        setPrompt("оцени место, когда вернёшься");
+        setPrompt("rate it when you get back");
         persistPending();
       }
       return;
@@ -1863,7 +2058,17 @@ const spin = {
     // sides of the city clean off the screen, so the floor is the city fit.
     const fit = Math.min((W * 0.62) / spanX, (H * 0.5) / spanY);
     const s = Math.max(cityFitScale() * 0.85, Math.min(fit, 120000));
-    focusOn(cx, cy, W / 2, H * 0.30, s);
+    /* The survivors sit high, because the result block will land in the
+       middle of the frame. But a triangle too wide for the safe box has its
+       scale clamped up to the floor, and an anchor at 0.30 H then hangs the
+       top vertex off the screen — where the light can walk to it and there
+       is nothing on screen at all for a fifth of a second. So the anchor
+       slides back toward the centre by exactly as much as it has to. */
+    const halfH = (spanY * s) / 2 + 90;
+    const ay = halfH * 2 > H
+      ? H / 2
+      : Math.min(Math.max(H * 0.30, halfH), H - halfH);
+    focusOn(cx, cy, W / 2, ay, s);
   },
 
   lock(now) {
@@ -1888,7 +2093,7 @@ const spin = {
 const NO_PAYMENT_CATEGORIES = new Set(["park", "market", "street food", "viewpoint", "lanes"]);
 function pickRule(category) {
   const all = D.rules || [];
-  if (!all.length) return { ru: "", zh: "" };
+  if (!all.length) return { en: "", zh: "" };
   const ok = NO_PAYMENT_CATEGORIES.has(category)
     ? all.filter((r) => !r.requiresPayment)
     : all;
@@ -1915,10 +2120,10 @@ if (!filters.cats.length) filters.cats = DEFAULT_FILTERS.cats.slice();
 if (!filters.dists.length) filters.dists = DEFAULT_FILTERS.dists.slice();
 
 const RADII = [
-  { km: 1, label: "1 км" },
-  { km: 3, label: "3 км" },
-  { km: 8, label: "8 км" },
-  { km: 0, label: "весь город" },
+  { km: 1, label: "1 km" },
+  { km: 3, label: "3 km" },
+  { km: 8, label: "8 km" },
+  { km: 0, label: "whole city" },
 ];
 
 function saveFilters() {
@@ -2022,7 +2227,7 @@ function showResult(i) {
 
   if (filters.pos) {
     const km = haversineKm(filters.pos.lat, filters.pos.lng, v.lat, v.lng);
-    $("pdist").textContent = km.toFixed(1) + " км  ·  примерно " + stopsForKm(km) + " " + plural(stopsForKm(km), "остановка", "остановки", "остановок");
+    $("pdist").textContent = km.toFixed(1) + " km  ·  about " + stopsForKm(km) + " " + plural(stopsForKm(km), "stop", "stops");
   } else {
     $("pdist").textContent = "";
   }
@@ -2032,11 +2237,8 @@ function showResult(i) {
   wipeIn($("pzh"));
 }
 
-function plural(n, one, few, many) {
-  const m10 = n % 10, m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
-  return many;
+function plural(n, one, many) {
+  return n === 1 ? one : many;
 }
 
 /* Coordinates count up to their final value rather than appearing. Tabular
@@ -2054,7 +2256,7 @@ function updateCoordCount(now) {
 
 function showRule(rule) {
   spin.ruleShown = rule;
-  $("ruletext").textContent = rule.ru || "";
+  $("ruletext").textContent = rule.en || rule.ru || "";
   $("rulezh").textContent = rule.zh || "";
 }
 
@@ -2148,7 +2350,7 @@ function dialog(opts) {
   $("dbox").className = "box" + (opts.warn ? " warn" : "");
   const btns = $("dbtns");
   btns.innerHTML = "";
-  for (const b of opts.buttons || [{ label: "ок" }]) {
+  for (const b of opts.buttons || [{ label: "ok" }]) {
     const el = document.createElement("button");
     el.className = "btn" + (b.primary ? " primary" : "");
     el.textContent = b.label;
@@ -2163,7 +2365,16 @@ function dialog(opts) {
 
 /* ------------------------------------------------------------- screen A */
 
+/* Every chip in here is a button that rebuilds the screen it lives on, so
+   the scroll position has to be carried across the rebuild by hand. Without
+   it, tapping the last district throws the list back to the top and he has
+   to find his place again on every single tap. */
 function buildScreenA() {
+  const scroller = $("ascroll");
+  const keepScroll = scroller ? scroller.scrollTop : 0;
+
+  const counts = filterCounts();
+
   const rc = $("radiusChips");
   rc.innerHTML = "";
   for (const r of RADII) {
@@ -2173,7 +2384,7 @@ function buildScreenA() {
     b.onclick = () => {
       filters.radius = r.km;
       if (r.km > 0 && !filters.pos) {
-        toast("сначала отметь, где ты стоишь");
+        toast("mark where you are standing first");
       }
       saveFilters();
       buildScreenA();
@@ -2184,17 +2395,16 @@ function buildScreenA() {
 
   const cc = $("catChips");
   cc.innerHTML = "";
-  const counts = categoryCounts();
   for (const c of CATEGORIES) {
     const on = filters.cats.includes(c.id);
+    const n = counts.byCat.get(c.id) || 0;
     const b = document.createElement("button");
-    b.className = "chip" + (on ? " on" : "");
-    b.innerHTML = "";
-    b.appendChild(document.createTextNode(c.ru || c.en || c.id));
-    const n = document.createElement("span");
-    n.className = "n";
-    n.textContent = counts.get(c.id) || 0;
-    b.appendChild(n);
+    b.className = "chip" + (on ? " on" : "") + (!on && n === 0 ? " nil" : "");
+    b.appendChild(document.createTextNode(c.en || c.ru || c.id));
+    const tag = document.createElement("span");
+    tag.className = "n";
+    tag.textContent = n;
+    b.appendChild(tag);
     b.onclick = () => {
       toggle(filters.cats, c.id);
       saveFilters();
@@ -2208,9 +2418,14 @@ function buildScreenA() {
   dc.innerHTML = "";
   for (const d of DISTRICTS) {
     const on = filters.dists.includes(d.name);
+    const n = counts.byDist.get(d.name) || 0;
     const b = document.createElement("button");
-    b.className = "chip" + (on ? " on" : "");
-    b.textContent = d.name;
+    b.className = "chip" + (on ? " on" : "") + (!on && n === 0 ? " nil" : "");
+    b.appendChild(document.createTextNode(d.name));
+    const tag = document.createElement("span");
+    tag.className = "n";
+    tag.textContent = n;
+    b.appendChild(tag);
     b.onclick = () => {
       toggle(filters.dists, d.name);
       saveFilters();
@@ -2220,11 +2435,26 @@ function buildScreenA() {
     dc.appendChild(b);
   }
 
-  $("posInfo").textContent = filters.pos
-    ? "позиция: " + filters.pos.lat.toFixed(4) + ", " + filters.pos.lng.toFixed(4)
-    : "позиция не задана — радиус не применяется";
+  // the three summaries, so a collapsed section still says what it is doing
+  const rad = RADII.find((r) => r.km === filters.radius);
+  const radLive = filters.radius > 0 && !filters.pos;
+  const radSel = $("radSel");
+  radSel.textContent = radLive ? "needs a position" : (rad ? rad.label : "");
+  radSel.classList.toggle("warn", radLive);
+  $("catSel").textContent = filters.cats.length + " / " + CATEGORIES.length;
+  $("distSel").textContent = filters.dists.length + " / " + DISTRICTS.length;
+  const posInfo = $("posInfo");
+  posInfo.textContent = filters.pos
+    ? "position: " + filters.pos.lat.toFixed(4) + ", " + filters.pos.lng.toFixed(4)
+    : radLive
+      ? "position not set — the radius does nothing until it is"
+      : "position not set";
+  posInfo.classList.toggle("warnline", radLive);
   $("bGps").style.display = navigator.geolocation ? "" : "none";
+  $("bClearPos").style.display = filters.pos ? "" : "none";
   updateCount();
+
+  if (scroller) scroller.scrollTop = keepScroll;
 }
 
 function toggle(arr, value) {
@@ -2233,30 +2463,38 @@ function toggle(arr, value) {
   else arr.splice(i, 1);
 }
 
-function categoryCounts() {
-  const m = new Map();
+/* A number on a chip is only useful if it answers "how many does tapping
+   this get me". So each count is measured against every filter except the
+   one the chip belongs to, in a single pass over the venue table. */
+function filterCounts() {
+  const cats = new Set(filters.cats);
+  const dists = new Set(filters.dists);
+  const useRadius = filters.radius > 0 && filters.pos;
+  const byCat = new Map(), byDist = new Map();
   for (let i = 0; i < V.n; i++) {
     if (S.visited[i]) continue;
-    m.set(V.cat[i], (m.get(V.cat[i]) || 0) + 1);
+    if (useRadius && haversineKm(filters.pos.lat, filters.pos.lng, V.lat[i], V.lng[i]) > filters.radius) continue;
+    if (dists.has(V.dist[i])) byCat.set(V.cat[i], (byCat.get(V.cat[i]) || 0) + 1);
+    if (cats.has(V.cat[i])) byDist.set(V.dist[i], (byDist.get(V.dist[i]) || 0) + 1);
   }
-  return m;
+  return { byCat, byDist };
 }
 
 function updateCount() {
   const n = pool.length;
   const line = $("countline");
-  line.textContent = n === 0 ? "ни одного" : String(n);
+  line.textContent = n === 0 ? "none" : String(n);
   line.classList.toggle("zero", n === 0);
   $("counthint").textContent = n === 0
-    ? "ослабь фильтр — крутить нечего"
-    : plural(n, "место подходит", "места подходят", "мест подходит");
+    ? "loosen the filter — nothing to spin"
+    : plural(n, "place matches", "places match");
   $("aSpin").disabled = n === 0;
 }
 
 /* ------------------------------------------------------------- screen C */
 
 let ratingTarget = null; // the record being rated or edited
-let ratingFrom = "map";  // where "назад" should return to
+let ratingFrom = "map";  // where "back" should return to
 let draft = { stops: null, fromTheAirport: false, nerve: null };
 
 function buildScales() {
@@ -2291,7 +2529,7 @@ function paintScales() {
 function openRating(record, from) {
   ratingFrom = from || "map";
   if (!record) {
-    toast("сначала крутани — оценивать нечего");
+    toast("spin first — there is nothing to rate");
     return;
   }
   ratingTarget = record;
@@ -2303,7 +2541,7 @@ function openRating(record, from) {
     (hasCJK(p.name) ? p.name + "  ·  " : "") +
     (CAT_LABEL.get(p.category) || p.category || "") + "  ·  " + (p.district || "") +
     "<br>WGS-84 " + p.lat.toFixed(5) + " " + p.lng.toFixed(5) +
-    "<br>GCJ-02 " + gcj[0].toFixed(5) + " " + gcj[1].toFixed(5) + " — для 高德 / Baidu";
+    "<br>GCJ-02 " + gcj[0].toFixed(5) + " " + gcj[1].toFixed(5) + " — for 高德 / Baidu";
 
   const r = record.rating;
   draft = r
@@ -2317,8 +2555,8 @@ function openRating(record, from) {
 
 function saveRating() {
   if (!ratingTarget) return;
-  if (draft.stops == null) { toast("сколько остановок это стоит?"); return; }
-  if (draft.nerve == null) { toast("оцени нерв — от 1 до 5"); return; }
+  if (draft.stops == null) { toast("how many stops is it worth?"); return; }
+  if (draft.nerve == null) { toast("rate the nerve — 1 to 5"); return; }
   const price = parseInt($("cPrice").value, 10);
   const now = new Date();
   ratingTarget.rating = {
@@ -2353,24 +2591,24 @@ function saveRating() {
     showScreen("screenD");
   } else {
     showScreen(null);
-    setPrompt("коснись, чтобы крутить");
+    setPrompt("tap to spin");
   }
-  toast("записано · " + visitedRecords().length + " " +
-    plural(visitedRecords().length, "место", "места", "мест") + " в каталоге");
+  toast("saved · " + visitedRecords().length + " " +
+    plural(visitedRecords().length, "place", "places") + " in the catalogue");
 }
 
 /* Nothing deletes a rating without a confirmation step. CLAUDE.md. */
 function deleteRating() {
   if (!ratingTarget) return;
-  const name = (ratingTarget.place && (ratingTarget.place.nameLatin || ratingTarget.place.name)) || "это место";
+  const name = (ratingTarget.place && (ratingTarget.place.nameLatin || ratingTarget.place.name)) || "this place";
   dialog({
     warn: true,
-    title: "Удалить оценку?",
-    body: name + " вернётся в барабан, а поездка исчезнет из каталога. Это нельзя отменить.",
+    title: "Delete this rating?",
+    body: name + " goes back into the drum and the trip disappears from the catalogue. This cannot be undone.",
     buttons: [
-      { label: "оставить" },
+      { label: "keep it" },
       {
-        label: "удалить", primary: true,
+        label: "delete", primary: true,
         onClick: () => {
           spins = spins.filter((r) => r !== ratingTarget);
           saveSpins();
@@ -2378,7 +2616,7 @@ function deleteRating() {
           refreshPool();
           buildArchive();
           showScreen("screenD");
-          toast("удалено");
+          toast("deleted");
         },
       },
     ],
@@ -2399,14 +2637,14 @@ function buildArchive() {
       })
     : list;
 
-  $("dCount").textContent = list.length + " " + plural(list.length, "место", "места", "мест") + " в каталоге";
+  $("dCount").textContent = list.length + " " + plural(list.length, "place", "places") + " in the catalogue";
   const box = $("arclist");
   box.innerHTML = "";
 
   if (!shown.length) {
     const e = document.createElement("div");
     e.className = "empty";
-    e.textContent = q ? "ничего не нашлось" : "каталог пуст.\nпервая звезда появится после первой оценки.";
+    e.textContent = q ? "nothing found" : "the catalogue is empty.\nthe first star appears after the first rating.";
     box.appendChild(e);
     return;
   }
@@ -2429,7 +2667,7 @@ function buildArchive() {
     }
     const st = document.createElement("div");
     st.className = "st" + (r.rating.stops === 0 ? " skip" : "");
-    st.textContent = r.rating.stops === 0 ? "мимо" : r.rating.stops + " ост.";
+    st.textContent = r.rating.stops === 0 ? "skip" : r.rating.stops + (r.rating.stops === 1 ? " stop" : " stops");
     row.append(no, nm, st);
     row.onclick = () => openRating(r, "archive");
     box.appendChild(row);
@@ -2446,7 +2684,7 @@ function buildManualForm() {
   for (const cat of CATEGORIES) {
     const o = document.createElement("option");
     o.value = cat.id;
-    o.textContent = cat.ru || cat.en || cat.id;
+    o.textContent = cat.en || cat.ru || cat.id;
     c.appendChild(o);
   }
   const d = $("mDist");
@@ -2460,14 +2698,14 @@ function buildManualForm() {
   $("mName").value = "";
   $("mZh").value = "";
   manualPos = null;
-  $("mPos").textContent = "не задана";
+  $("mPos").textContent = "not set";
 }
 
 function saveManualPlace() {
   const name = $("mZh").value.trim() || $("mName").value.trim();
   const latin = $("mName").value.trim();
-  if (!name) { toast("нужно название"); return; }
-  if (!manualPos) { toast("отметь точку на карте"); return; }
+  if (!name) { toast("a name is required"); return; }
+  if (!manualPos) { toast("mark the point on the map"); return; }
   const rec = {
     id: "manual:" + Date.now().toString(36) + ":" + Math.floor(Math.random() * 1e6).toString(36),
     name,
@@ -2481,7 +2719,7 @@ function saveManualPlace() {
   manual.push(rec);
   saveManual();
   rebuildWorld();
-  toast("добавлено — участвует в следующих раскрутках");
+  toast("added — it joins the next spins");
   showScreen("screenD");
 }
 
@@ -2526,7 +2764,7 @@ function flatPlace(r) {
     spinId: r.id,
     distanceKm: r.distanceKm,
     rerolls: r.rerolls || 0,
-    ruleRu: r.rule ? r.rule.ru : null,
+    ruleEn: r.rule ? (r.rule.en || r.rule.ru || null) : null,
     ruleZh: r.rule ? r.rule.zh : null,
     updatedAt: r.updatedAt,
   };
@@ -2555,31 +2793,31 @@ function download(filename, text, mime) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 4000);
-    toast("сохранено: " + filename);
+    toast("saved: " + filename);
   } catch (e) {
     // Safari under file:// can refuse the download. Never lose the export:
     // put it on screen so it can be selected and sent by hand.
     dialog({
-      title: "Скачивание не сработало",
+      title: "The download did not work",
       body:
-        "Скопируй текст и отправь его себе — данные не потеряны.<br><br>" +
+        "Copy the text and send it to yourself — nothing is lost.<br><br>" +
         '<textarea class="field" style="height:38vh;font-size:11px" readonly>' +
         text.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])) +
         "</textarea>",
-      buttons: [{ label: "закрыть", primary: true }],
+      buttons: [{ label: "close", primary: true }],
     });
   }
 }
 
 function exportJson() {
   const places = visitedRecords();
-  if (!places.length) { toast("каталог пуст — нечего выгружать"); return; }
+  if (!places.length) { toast("the catalogue is empty — nothing to export"); return; }
   download("places.json", JSON.stringify(exportPayload(), null, 2), "application/json");
 }
 
 function exportCsv() {
   const rows = visitedRecords().map(flatPlace);
-  if (!rows.length) { toast("каталог пуст — нечего выгружать"); return; }
+  if (!rows.length) { toast("the catalogue is empty — nothing to export"); return; }
   const cols = Object.keys(rows[0]);
   const esc = (v) => {
     if (v == null) return "";
@@ -2610,12 +2848,12 @@ function importJson(text) {
   try {
     data = JSON.parse(text);
   } catch (e) {
-    dialog({ warn: true, title: "Файл не читается", body: "Это не places.json." });
+    dialog({ warn: true, title: "The file cannot be read", body: "This is not places.json." });
     return;
   }
   const places = data && data.places;
   if (!Array.isArray(places)) {
-    dialog({ warn: true, title: "Файл не читается", body: "В файле нет списка places." });
+    dialog({ warn: true, title: "The file cannot be read", body: "The file has no places list." });
     return;
   }
 
@@ -2648,7 +2886,7 @@ function importJson(text) {
           category: p.category, district: p.district,
           lat: p.lat, lng: p.lng, source: p.source || "osm",
         },
-        rule: p.ruleRu || p.ruleZh ? { ru: p.ruleRu, zh: p.ruleZh } : null,
+        rule: p.ruleEn || p.ruleRu || p.ruleZh ? { en: p.ruleEn || p.ruleRu || null, zh: p.ruleZh } : null,
         spunAt: p.visitedAt || null,
         fromLat: null, fromLng: null,
         distanceKm: p.distanceKm == null ? null : p.distanceKm,
@@ -2662,7 +2900,7 @@ function importJson(text) {
       existing.rating = rating;
       existing.visitedAt = p.visitedAt || existing.visitedAt;
       existing.updatedAt = p.updatedAt;
-      if (p.ruleRu || p.ruleZh) existing.rule = { ru: p.ruleRu, zh: p.ruleZh };
+      if (p.ruleEn || p.ruleRu || p.ruleZh) existing.rule = { en: p.ruleEn || p.ruleRu || null, zh: p.ruleZh };
       updated++;
     } else {
       skipped++;
@@ -2674,9 +2912,9 @@ function importJson(text) {
   rebuildWorld();
   buildArchive();
   dialog({
-    title: "Импорт закончен",
-    body: `добавлено ${added}<br>обновлено ${updated}<br>без изменений ${skipped}` +
-      (manualAdded ? `<br>своих мест восстановлено ${manualAdded}` : ""),
+    title: "Import finished",
+    body: `added ${added}<br>updated ${updated}<br>unchanged ${skipped}` +
+      (manualAdded ? `<br>own places restored ${manualAdded}` : ""),
   });
 }
 
@@ -2773,13 +3011,13 @@ function handleTap(px, py) {
       refreshPool();
       buildScreenA();
       showScreen("screenA");
-      setPrompt(spin.phase === "idle" ? "коснись, чтобы крутить" : "");
+      setPrompt(spin.phase === "idle" ? "tap to spin" : "");
     } else {
       manualPos = { lat: round5(lat), lng: round5(lng) };
       $("mPos").textContent = manualPos.lat.toFixed(5) + ", " + manualPos.lng.toFixed(5);
       pickMode = null;
       showScreen("screenM");
-      setPrompt(spin.phase === "idle" ? "коснись, чтобы крутить" : "");
+      setPrompt(spin.phase === "idle" ? "tap to spin" : "");
     }
     return;
   }
@@ -2788,16 +3026,16 @@ function handleTap(px, py) {
     // A re-roll exists only behind an explicit confirm, and it is logged.
     dialog({
       warn: true,
-      title: "Перекрутить?",
-      body: "Место сменится, а счётчик перекруток вырастет и останется в записи — его видно на экране.",
+      title: "Spin again?",
+      body: "The place changes, the re-roll counter goes up and stays in the record — it is visible on screen.",
       buttons: [
-        { label: "оставить как есть" },
+        { label: "leave it as it is" },
         {
-          label: "перекрутить", primary: true,
+          label: "spin again", primary: true,
           onClick: () => {
             const rejected = spin.winner;
             const p = refreshPool().filter((i) => i !== rejected);
-            if (!p.length) { toast("крутить больше нечего"); return; }
+            if (!p.length) { toast("nothing left to spin"); return; }
             spin.start(p, true);
           },
         },
@@ -2809,7 +3047,7 @@ function handleTap(px, py) {
   if (spin.canStart()) {
     const p = refreshPool();
     if (!p.length) {
-      toast("ни одного места — ослабь фильтр");
+      toast("no places — loosen the filter");
       return;
     }
     spin.tapPoint = [px, py];
@@ -2843,7 +3081,7 @@ function bind() {
   $("aClose").onclick = () => showScreen(null);
   $("aSpin").onclick = () => {
     showScreen(null);
-    setPrompt("коснись, чтобы крутить");
+    setPrompt("tap to spin");
   };
   $("bArchive").onclick = () => { buildArchive(); showScreen("screenD"); };
   $("dClose").onclick = () => showScreen(null);
@@ -2856,35 +3094,40 @@ function bind() {
   $("bPickHere").onclick = () => {
     pickMode = "position";
     showScreen(null);
-    setPrompt("коснись карты — там, где ты стоишь");
+    setPrompt("tap the map where you are standing");
   };
 
   /* GPS is an enhancement, never the path. It does not work over file:// in
      iOS Safari at all, so it must never block and never raise a dialog.
      CLAUDE.md, known traps. */
   $("bGps").onclick = () => {
-    if (!navigator.geolocation) { toast("gps недоступен — отметь вручную"); return; }
-    toast("ищу спутники…");
+    if (!navigator.geolocation) { toast("gps unavailable — mark it by hand"); return; }
+    toast("looking for satellites…");
     navigator.geolocation.getCurrentPosition(
       (p) => {
         filters.pos = { lat: round5(p.coords.latitude), lng: round5(p.coords.longitude) };
         saveFilters();
         refreshPool();
         buildScreenA();
-        toast("позиция с gps");
+        toast("position from gps");
       },
-      () => { toast("gps не ответил — отметь вручную"); },
+      () => { toast("gps did not answer — mark it by hand"); },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
   };
 
-  $("catAll").onclick = () => {
-    filters.cats = filters.cats.length === CATEGORIES.length ? [] : CATEGORIES.map((c) => c.id);
-    saveFilters(); buildScreenA(); refreshPool();
-  };
-  $("distAll").onclick = () => {
-    filters.dists = filters.dists.length === DISTRICTS.length ? [] : DISTRICTS.map((d) => d.name);
-    saveFilters(); buildScreenA(); refreshPool();
+  const setCats = (v) => { filters.cats = v; saveFilters(); buildScreenA(); refreshPool(); };
+  const setDists = (v) => { filters.dists = v; saveFilters(); buildScreenA(); refreshPool(); };
+  $("catAll").onclick = () => setCats(CATEGORIES.map((c) => c.id));
+  $("catNone").onclick = () => setCats([]);
+  $("distAll").onclick = () => setDists(DISTRICTS.map((d) => d.name));
+  $("distNone").onclick = () => setDists([]);
+
+  $("bClearPos").onclick = () => {
+    filters.pos = null;
+    saveFilters();
+    refreshPool();
+    buildScreenA();
   };
 
   $("cClose").onclick = () => {
@@ -2905,7 +3148,7 @@ function bind() {
     if (!f) return;
     const fr = new FileReader();
     fr.onload = () => importJson(String(fr.result));
-    fr.onerror = () => dialog({ warn: true, title: "Файл не открылся", body: "Попробуй ещё раз." });
+    fr.onerror = () => dialog({ warn: true, title: "The file would not open", body: "Try again." });
     fr.readAsText(f);
     e.target.value = "";
   };
@@ -2915,7 +3158,7 @@ function bind() {
   $("mPick").onclick = () => {
     pickMode = "manual";
     showScreen(null);
-    setPrompt("коснись карты — где это место");
+    setPrompt("tap the map where the place is");
   };
 }
 
@@ -2958,31 +3201,31 @@ function cityView(animate) {
 function showHelp() {
   const n = visitedRecords().length;
   dialog({
-    title: "Перед съёмкой",
+    title: "Before filming",
     body:
       '<div class="help">' +
-      "<b>Яркость на максимум.</b> Night Shift и True Tone — выключить, иначе цвет уплывёт между дублями.<br>" +
-      "<b>Одним дублем.</b> Часы в углу идут всё время — это и есть доказательство честности.<br>" +
-      "<b>9:16</b> показывает, что попадёт в кадр. Весь текст результата — между линиями.<br>" +
-      "<b>Скрыть</b> убирает кнопки. Вернуть — той же кнопкой в левом нижнем углу.<br>" +
-      "<b>Перекрутка</b> спрашивает подтверждение и остаётся в записи.<br>" +
+      "<b>Brightness to maximum.</b> Turn Night Shift and True Tone off, or the colour drifts between takes.<br>" +
+      "<b>One take.</b> The clock in the corner runs the whole time — that is the proof it was honest.<br>" +
+      "<b>9:16</b> shows what ends up in frame. All of the result text sits between the lines.<br>" +
+      "<b>Hide</b> clears the buttons. The same button, bottom left, brings them back.<br>" +
+      "<b>Spinning again</b> asks for confirmation and stays in the record.<br>" +
       "<hr>" +
-      "координаты на экране — WGS-84 (osm).<br>" +
-      "для 高德 и Baidu нужен GCJ-02 — он на экране оценки, отличается на 300–600 м.<br>" +
+      "the coordinates on screen are WGS-84 (osm).<br>" +
+      "高德 and Baidu need GCJ-02 — it is on the rating screen, and differs by 300–600 m.<br>" +
       "<hr>" +
-      "в каталоге " + n + " " + plural(n, "место", "места", "мест") + ".<br>" +
-      "приложение работает полностью офлайн.<br>" +
+      n + " " + plural(n, "place", "places") + " in the catalogue.<br>" +
+      "the app runs fully offline.<br>" +
       (location.protocol.startsWith("http")
         ? (offlineReady
-            ? "<b>офлайн-копия на устройстве: есть.</b> интернет больше не нужен.<br>"
-            : "офлайн-копия ещё не сохранена — побудь в сети пару секунд.<br>")
+            ? "<b>offline copy on this device: yes.</b> the internet is no longer needed.<br>"
+            : "the offline copy is not saved yet — stay online for a couple of seconds.<br>")
         : "") +
-      (store.live ? "" : "<b>внимание: браузер не даёт сохранять на диск. оценки живут только до перезагрузки — выгрузи их сразу.</b><br>") +
+      (store.live ? "" : "<b>warning: this browser will not save to disk. ratings live only until reload — export them now.</b><br>") +
       "<hr>" +
-      "карта: " + (D.attribution || "© OpenStreetMap contributors") + "<br>" +
-      "данные собраны " + (D.builtAt || "—") +
+      "map: " + (D.attribution || "© OpenStreetMap contributors") + "<br>" +
+      "data collected " + (D.builtAt || "—") +
       "</div>",
-    buttons: [{ label: "понял", primary: true }],
+    buttons: [{ label: "got it", primary: true }],
   });
 }
 
@@ -3013,7 +3256,7 @@ async function checkOfflineCopy() {
         const first = !offlineReady;
         offlineReady = true;
         // Tell him once, plainly: it is safe to walk away from the network.
-        if (first) toast("копия сохранена — работает без интернета", 5000);
+        if (first) toast("copy saved — it works without the internet", 5000);
         return;
       }
     }
@@ -3043,7 +3286,7 @@ function init() {
   tickClock();
   setInterval(tickClock, 1000);
 
-  setPrompt("коснись, чтобы крутить");
+  setPrompt("tap to spin");
   requestAnimationFrame(frame);
 
   // everything above worked: take the "no scripts" banner down
@@ -3051,7 +3294,7 @@ function init() {
   if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
 
   if (!store.live) {
-    toast("сохранение недоступно — выгружай оценки сразу", 8000);
+    toast("saving is unavailable — export your ratings immediately", 8000);
   }
   installOfflineCopy();
   // first run: the filter screen explains itself better than a tour does

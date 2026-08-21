@@ -1,8 +1,8 @@
 {
-  "name": "Шанхайская рулетка",
-  "short_name": "Рулетка",
-  "description": "Офлайн-рулетка мест по Шанхаю",
-  "lang": "ru",
+  "name": "Shanghai Roulette",
+  "short_name": "Roulette",
+  "description": "An offline place roulette for Shanghai",
+  "lang": "en",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

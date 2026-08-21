@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>iPad check</title>
@@ -24,14 +24,14 @@ small{display:block;margin-top:22px;opacity:.6;font-size:13px;line-height:1.6;wo
 <body>
 
 <h1>Shanghai Roulette</h1>
-<div>проверка планшета</div>
+<div>tablet check</div>
 
 <!-- Static. If JavaScript runs, it is replaced. If it stays as written
      below, this viewer does not execute scripts and the real app cannot
      work here either. -->
 <div class="verdict" id="verdict">
-  СКРИПТЫ НЕ ВЫПОЛНЯЮТСЯ.<br>
-  Этот просмотрщик показывает файл, но не запускает его.
+  SCRIPTS ARE NOT RUNNING.<br>
+  This viewer shows the file but does not run it.
 </div>
 
 <div id="rows"></div>
@@ -51,7 +51,7 @@ small{display:block;margin-top:22px;opacity:.6;font-size:13px;line-height:1.6;wo
   var v = document.getElementById("verdict");
   v.style.borderColor = "#9ad39a";
   v.style.color = "#9ad39a";
-  v.innerHTML = "СКРИПТЫ РАБОТАЮТ.<br>Здесь приложение запустится.";
+  v.innerHTML = "SCRIPTS ARE RUNNING.<br>The app will start here.";
 
   // canvas 2d — the entire map is drawn with it
   var canvasOk = false;
@@ -69,37 +69,37 @@ small{display:block;margin-top:22px;opacity:.6;font-size:13px;line-height:1.6;wo
     }
     canvasOk = g.getImageData(0, 0, 1, 1).data.length === 4;
   } catch (e) { canvasOk = false; }
-  line("canvas — карта", canvasOk ? "да" : "НЕТ", canvasOk);
+  line("canvas — the map", canvasOk ? "yes" : "NO", canvasOk);
 
   // localStorage — every rating is a real trip that cannot be redone
-  var lsOk = false, lsNote = "НЕТ";
+  var lsOk = false, lsNote = "NO";
   try {
     localStorage.setItem("sh.check", "1");
     lsOk = localStorage.getItem("sh.check") === "1";
     localStorage.removeItem("sh.check");
-    lsNote = lsOk ? "да" : "НЕТ";
-  } catch (e) { lsNote = "НЕТ — " + e.name; }
-  line("сохранение оценок", lsNote, lsOk);
+    lsNote = lsOk ? "yes" : "NO";
+  } catch (e) { lsNote = "NO — " + e.name; }
+  line("ratings are saved", lsNote, lsOk);
 
   // a rating written last time this file was opened
   var seen = null;
   try { seen = localStorage.getItem("sh.checkPersist"); localStorage.setItem("sh.checkPersist", new Date().toISOString()); } catch (e) {}
-  line("пережило прошлый запуск", seen ? "да — " + seen.slice(11, 19) : "первый запуск", !!seen);
+  line("survived the last open", seen ? "yes — " + seen.slice(11, 19) : "first open", !!seen);
 
   var cryptoOk = false;
   try { var a = new Uint32Array(1); crypto.getRandomValues(a); cryptoOk = true; } catch (e) {}
-  line("честный случайный выбор", cryptoOk ? "да" : "НЕТ (есть запасной)", cryptoOk);
+  line("fair random choice", cryptoOk ? "yes" : "NO (fallback in use)", cryptoOk);
 
-  line("экран", window.innerWidth + " × " + window.innerHeight + " @" + (window.devicePixelRatio || 1) + "x", true);
-  line("web audio", (window.AudioContext || window.webkitAudioContext) ? "да" : "НЕТ", !!(window.AudioContext || window.webkitAudioContext));
-  line("файлы (экспорт)", (typeof Blob !== "undefined" && typeof URL !== "undefined" && URL.createObjectURL) ? "да" : "НЕТ",
+  line("screen", window.innerWidth + " × " + window.innerHeight + " @" + (window.devicePixelRatio || 1) + "x", true);
+  line("web audio", (window.AudioContext || window.webkitAudioContext) ? "yes" : "NO", !!(window.AudioContext || window.webkitAudioContext));
+  line("files (export)", (typeof Blob !== "undefined" && typeof URL !== "undefined" && URL.createObjectURL) ? "yes" : "NO",
        typeof Blob !== "undefined" && !!(URL && URL.createObjectURL));
 
   var t0 = performance.now(), n = 0;
   (function loop() {
     n++;
     if (performance.now() - t0 < 1500) requestAnimationFrame(loop);
-    else line("частота кадров", Math.round(n / ((performance.now() - t0) / 1000)) + " fps", n / 1.5 > 45);
+    else line("frame rate", Math.round(n / ((performance.now() - t0) / 1000)) + " fps", n / 1.5 > 45);
   })();
 
   document.getElementById("ua").textContent = navigator.userAgent;
