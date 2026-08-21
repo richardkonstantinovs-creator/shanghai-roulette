@@ -302,24 +302,120 @@ body.hideui .corner,body.hideui #prompt{display:none;}
 .btn.primary{color:var(--nova);border-color:var(--nova);}
 .btn.primary[disabled]{color:var(--engrave);border-color:rgba(127,169,196,.25);}
 
-/* ---------------------------------------------------------- rating scale */
-.scale{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;}
-.scale b{
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--utility);font-size:17px;font-weight:700;
-  min-height:56px;color:var(--engrave);
-  border:3px solid rgba(127,169,196,.2);cursor:pointer;
+/* ---------------------------------------------------------- rating screen
+   The score is the product: the guide site rates every place in metro stops,
+   and this is where that number is decided. Sixteen identical boxes made the
+   headline measurement look like a phone keypad and gave 15 the same weight
+   as 1, so the stops control is a line with stations on it — the thing being
+   measured, drawn as itself — and the rest of the screen is ranked under it. */
+
+/* the coordinates, under the header. Two systems, 300–600 m apart in
+   Shanghai, and only one of them navigates on a Chinese phone: that one is
+   in the warm colour and says so. */
+.coordrow{
+  display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:16px;
+  font-family:var(--utility);font-size:12px;font-weight:600;letter-spacing:.08em;
+  color:var(--engrave);
 }
-.scale b.on{color:var(--ink);background:var(--rubbing);border-color:var(--rubbing);}
-.scale b.zero.on{color:var(--ink);background:var(--engrave);border-color:var(--engrave);}
+.coordrow .k{opacity:.5;margin-right:9px;letter-spacing:.22em;}
+.coordrow .nav{color:var(--rubbing);}
+.coordrow .nav .k{color:var(--engrave);}
+
+/* the value a section currently holds, on the label's own line and set in
+   the display face — the number is the point of the section, not a caption */
+.readout{
+  margin-left:auto;font-family:var(--display);font-size:24px;font-weight:600;
+  letter-spacing:-.01em;color:var(--rubbing);text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+}
+.readout.none{font-family:var(--utility);font-size:11px;font-weight:700;
+  letter-spacing:.28em;text-transform:uppercase;color:var(--engrave);opacity:.45;}
+.readout .u{font-size:14px;opacity:.6;margin-left:6px;letter-spacing:.06em;}
+.readout .zh{font-family:var(--cjk);font-size:15px;opacity:.55;margin-left:10px;}
+
+/* the metro line. Fifteen stations, the rail behind them, and the stretch he
+   would actually ride drawn over it in the warm colour. */
+.stopline{position:relative;display:grid;grid-template-columns:repeat(15,1fr);height:76px;}
+/* The bar and the stations behind it are different things and must not share
+   a class name — this sheet is one flat namespace, and `.stopline .ridden`
+   would take `b.ridden` out of the grid with it. */
+.stopline .rail,.stopline .ride{
+  position:absolute;top:26px;height:3px;left:calc(100% / 30);
+}
+.stopline .rail{right:calc(100% / 30);background:rgba(127,169,196,.22);}
+.stopline .ride{width:0;background:var(--rubbing);opacity:.8;}
+.stopline b{
+  position:relative;display:flex;flex-direction:column;align-items:center;
+  padding-top:17px;cursor:pointer;
+}
+.stopline i{
+  width:19px;height:19px;border-radius:50%;
+  background:var(--abyss);border:3px solid rgba(127,169,196,.42);
+}
+.stopline u{
+  font-family:var(--utility);font-size:12px;font-weight:600;letter-spacing:.04em;
+  color:var(--engrave);opacity:.5;margin-top:9px;text-decoration:none;
+}
+/* every station up to the chosen one is on the ride, so it is filled too —
+   the eye reads the length of the warm stretch before it reads the number */
+.stopline b.past i{background:var(--rubbing);border-color:var(--rubbing);opacity:.55;}
+.stopline b.on i{
+  background:var(--rubbing);border-color:var(--rubbing);opacity:1;
+  box-shadow:0 0 0 5px rgba(240,226,200,.16);
+}
+.stopline b.on u{color:var(--rubbing);opacity:1;font-weight:700;}
+.stopline.off .rail{opacity:.5;}
+.stopline.off i{opacity:.35;}
+.stopline.off u{opacity:.25;}
+
 .nerve{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
 .nerve b{
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--utility);font-size:15px;font-weight:700;letter-spacing:.1em;
-  min-height:56px;color:var(--engrave);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  font-family:var(--utility);font-size:16px;font-weight:700;
+  min-height:60px;color:var(--engrave);
   border:3px solid rgba(127,169,196,.2);cursor:pointer;text-align:center;
 }
+.nerve b em{font-style:normal;line-height:1;}
+.nerve b s{font-size:9px;font-weight:700;letter-spacing:.16em;opacity:.5;text-decoration:none;}
 .nerve b.on{color:var(--ink);background:var(--rubbing);border-color:var(--rubbing);}
+.nerve b.on s{opacity:.72;}
+
+/* price is the least of the three, so it sits in its own label row rather
+   than taking a full-width field the way the two scales do */
+.fieldwrap{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.fieldwrap .cur{font-family:var(--utility);font-size:18px;color:var(--engrave);opacity:.6;}
+.fieldwrap .field{width:150px;text-align:right;min-height:50px;padding:12px 14px;}
+
+/* the task he was set, in the colour it was given in */
+.taskbox{border:3px solid rgba(255,176,58,.36);padding:16px 18px;margin-top:12px;}
+.taskbox .en{
+  font-family:var(--display);font-size:19px;font-weight:700;line-height:1.22;
+  color:var(--nova);
+}
+.taskbox .zh{
+  font-family:var(--cjk);font-size:14px;font-weight:600;letter-spacing:.12em;
+  color:var(--nova);opacity:.6;margin-top:9px;
+}
+.taskbox.none{border-color:rgba(127,169,196,.16);}
+.taskbox.none .en{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--engrave);opacity:.45;
+}
+.tripfacts{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--engrave);opacity:.45;margin-top:15px;
+}
+
+/* what is about to be written, in words, above the button that writes it */
+.ratesum{
+  flex:0 0 auto;
+  font-family:var(--utility);font-size:12px;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--rubbing);
+  padding:16px 0 2px;border-top:3px solid rgba(127,169,196,.28);
+}
+.ratesum.todo{color:var(--engrave);opacity:.5;}
+.ratefoot .btn{flex:0 0 auto;padding:18px 22px;}
+.ratefoot .btn.primary{flex:1 1 auto;}
 
 .field{
   font-family:var(--utility);font-size:20px;font-weight:600;letter-spacing:.06em;
@@ -567,26 +663,51 @@ window.addEventListener("error", function (e) {
     <button class="btn" id="cClose">back</button>
   </div>
 
-  <div class="section">
-    <div class="slabel">metro stops <span style="opacity:.5">— 0 means &laquo;skip it&raquo;</span></div>
-    <div class="scale" id="stopsScale"></div>
-    <div class="chips" style="margin-top:8px">
+  <!-- Only the middle scrolls, so SAVE stays in reach: this screen is a form
+       and in landscape the content is taller than the iPad. -->
+  <div class="ascroll">
+  <!-- the two coordinate systems, and which one navigates. CLAUDE.md trap 2 -->
+  <div class="coordrow" id="cCoord"></div>
+
+  <div class="section ruled">
+    <div class="srow">
+      <div class="slabel">metro stops</div>
+      <div class="readout" id="cStopsOut"></div>
+    </div>
+    <!-- the ride itself: a line, and how far down it this place is worth -->
+    <div class="stopline" id="stopsScale"></div>
+    <div class="chips" style="margin-top:16px">
+      <button class="chip" id="cSkip">skip it</button>
       <button class="chip" id="cAirport">worth the trip from the airport</button>
     </div>
   </div>
 
-  <div class="section">
-    <div class="slabel">price per person, ¥</div>
-    <input class="field" id="cPrice" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0">
-  </div>
-
-  <div class="section">
-    <div class="slabel">nerve — language, strangeness, threshold</div>
+  <div class="section ruled">
+    <div class="srow">
+      <div class="slabel">nerve</div>
+      <div class="readout" id="cNerveOut"></div>
+    </div>
     <div class="nerve" id="nerveScale"></div>
   </div>
 
-  <div class="spacer"></div>
-  <div class="footrow">
+  <div class="section ruled">
+    <div class="srow">
+      <div class="slabel">price per person</div>
+      <div class="fieldwrap">
+        <span class="cur">¥</span>
+        <input class="field" id="cPrice" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- what he was sent to do, and the facts of the trip: the context the
+       score is given in, and the reason this screen no longer ends in half
+       a page of nothing -->
+  <div class="section ruled" id="cTrip"></div>
+  </div>
+
+  <div class="ratesum" id="cSummary"></div>
+  <div class="footrow ratefoot">
     <button class="btn" id="cDelete">delete</button>
     <button class="btn primary" id="cSave">save</button>
   </div>
@@ -2663,33 +2784,122 @@ let ratingTarget = null; // the record being rated or edited
 let ratingFrom = "map";  // where "back" should return to
 let draft = { stops: null, fromTheAirport: false, nerve: null };
 
+/* Nerve is a five-point scale and a number alone teaches nobody what it
+   means, so each step carries a word on the cell and a sentence in the
+   readout. The words are the scale — change them and old records shift
+   meaning underneath the guide site. */
+const NERVE = [
+  { word: "easy",   says: "anyone could walk in" },
+  { word: "mild",   says: "a little out of your depth" },
+  { word: "real",   says: "you have to commit" },
+  { word: "hard",   says: "properly uncomfortable" },
+  { word: "brutal", says: "pure nerve" },
+];
+const STOPS_MAX = 15;
+
 function buildScales() {
+  /* The line is stations 1 to 15. Zero is not a distance — it is a verdict —
+     so it is a chip of its own rather than a station nobody would ride to. */
   const ss = $("stopsScale");
   ss.innerHTML = "";
-  for (let i = 0; i <= 15; i++) {
+  const rail = document.createElement("span");
+  rail.className = "rail";
+  const ridden = document.createElement("span");
+  ridden.className = "ride";
+  ss.appendChild(rail);
+  ss.appendChild(ridden);
+  for (let i = 1; i <= STOPS_MAX; i++) {
     const b = document.createElement("b");
-    b.textContent = i;
-    if (i === 0) b.classList.add("zero");
+    b.innerHTML = "<i></i><u></u>";
+    b.querySelector("u").textContent = i;
     b.onclick = () => { draft.stops = i; paintScales(); };
     ss.appendChild(b);
   }
   const ns = $("nerveScale");
   ns.innerHTML = "";
-  const labels = ["1", "2", "3", "4", "5"];
-  for (let i = 1; i <= 5; i++) {
+  NERVE.forEach((n, k) => {
     const b = document.createElement("b");
-    b.textContent = labels[i - 1];
-    b.onclick = () => { draft.nerve = i; paintScales(); };
+    b.innerHTML = "<em></em><s></s>";
+    b.querySelector("em").textContent = k + 1;
+    b.querySelector("s").textContent = n.word;
+    b.onclick = () => { draft.nerve = k + 1; paintScales(); };
     ns.appendChild(b);
-  }
+  });
+}
+
+function setReadout(el, html) {
+  el.classList.toggle("none", !html);
+  el.innerHTML = html || "not scored yet";
 }
 
 function paintScales() {
-  const ss = $("stopsScale").children;
-  for (let i = 0; i < ss.length; i++) ss[i].classList.toggle("on", draft.stops === i);
+  const line = $("stopsScale");
+  const st = draft.stops;                       // null, 0 (skip), or 1..15
+  const stops = st == null || st === 0 ? 0 : st;
+  line.classList.toggle("off", stops === 0);    // the whole line stands down
+  line.querySelector(".ride").style.width = stops ? ((stops - 1) / STOPS_MAX) * 100 + "%" : "0";
+  const bs = line.querySelectorAll("b");
+  for (let i = 0; i < bs.length; i++) {
+    bs[i].classList.toggle("on", stops === i + 1);
+    bs[i].classList.toggle("past", stops > 0 && i + 1 < stops);
+  }
+  setReadout($("cStopsOut"),
+    st == null ? "" :
+    st === 0 ? "skip it" :
+    st + '<span class="u">' + plural(st, "stop", "stops") + "</span>");
+
   const ns = $("nerveScale").children;
   for (let i = 0; i < ns.length; i++) ns[i].classList.toggle("on", draft.nerve === i + 1);
+  setReadout($("cNerveOut"), draft.nerve ? NERVE[draft.nerve - 1].says : "");
+
   $("cAirport").classList.toggle("on", !!draft.fromTheAirport);
+  $("cSkip").classList.toggle("on", draft.stops === 0);
+  paintSummary();
+}
+
+/* The task he was actually set, and the facts of the trip. A record whose
+   task was never opened says so — that is a real outcome, not a blank. */
+function paintTrip(record) {
+  const el = $("cTrip");
+  const rule = record.rule || null;
+  const en = rule ? rule.en || rule.ru || "" : "";
+  const facts = [];
+  if (record.spunAt) facts.push("spun " + String(record.spunAt).slice(0, 16).replace("T", "  "));
+  if (typeof record.distanceKm === "number") facts.push(record.distanceKm.toFixed(1) + " km out");
+  if (record.rerolls) facts.push("re-roll " + record.rerolls);
+
+  el.innerHTML =
+    '<div class="slabel">the task</div>' +
+    (en ? '<div class="taskbox"><div class="en"></div><div class="zh"></div></div>'
+        : '<div class="taskbox none"><div class="en">never opened</div></div>') +
+    '<div class="tripfacts"></div>';
+  if (en) {
+    el.querySelector(".taskbox .en").textContent = en;
+    el.querySelector(".taskbox .zh").textContent = rule.zh || "";
+  }
+  el.querySelector(".tripfacts").textContent = facts.join("  ·  ");
+}
+
+/* What is about to be written, in words. The last thing above the button
+   that writes it, and it says what is still missing until nothing is. */
+function paintSummary() {
+  const el = $("cSummary"), save = $("cSave");
+  const missing = [];
+  if (draft.stops == null) missing.push("the stops");
+  if (draft.nerve == null) missing.push("the nerve");
+  save.disabled = missing.length > 0;
+  if (missing.length) {
+    el.className = "ratesum todo";
+    el.textContent = "still to pick — " + missing.join(" and ");
+    return;
+  }
+  const price = parseInt($("cPrice").value, 10);
+  const bits = [draft.stops === 0 ? "skip it" : draft.stops + " " + plural(draft.stops, "stop", "stops")];
+  bits.push("nerve " + draft.nerve + " · " + NERVE[draft.nerve - 1].word);
+  if (!isNaN(price) && price > 0) bits.push("¥" + price);
+  if (draft.fromTheAirport) bits.push("worth the airport");
+  el.className = "ratesum";
+  el.textContent = bits.join("  ·  ");
 }
 
 function openRating(record, from) {
@@ -2703,11 +2913,15 @@ function openRating(record, from) {
   const latin = p.nameLatin || (hasCJK(p.name) ? "" : p.name);
   $("cName").textContent = latin || p.name || "";
   const gcj = wgsToGcj(p.lat, p.lng);
-  $("cMeta").innerHTML =
-    (hasCJK(p.name) ? p.name + "  ·  " : "") +
-    (CAT_LABEL.get(p.category) || p.category || "") + "  ·  " + (p.district || "") +
-    "<br>WGS-84 " + p.lat.toFixed(5) + " " + p.lng.toFixed(5) +
-    "<br>GCJ-02 " + gcj[0].toFixed(5) + " " + gcj[1].toFixed(5) + " — for 高德 / Baidu";
+  $("cMeta").textContent =
+    (hasCJK(p.name) && p.name !== $("cName").textContent ? p.name + "  ·  " : "") +
+    (CAT_LABEL.get(p.category) || p.category || "") + "  ·  " + (p.district || "");
+  $("cCoord").innerHTML =
+    '<span><b class="k">WGS-84</b>' + p.lat.toFixed(5) + "  " + p.lng.toFixed(5) + "</span>" +
+    '<span class="nav"><b class="k">GCJ-02</b>' + gcj[0].toFixed(5) + "  " + gcj[1].toFixed(5) +
+    '  <b class="k">navigate with this</b></span>';
+
+  paintTrip(record);
 
   const r = record.rating;
   draft = r
@@ -3310,6 +3524,9 @@ function bind() {
   $("cSave").onclick = saveRating;
   $("cDelete").onclick = deleteRating;
   $("cAirport").onclick = () => { draft.fromTheAirport = !draft.fromTheAirport; paintScales(); };
+  // 0 is a verdict, not a distance: picking it stands the whole line down
+  $("cSkip").onclick = () => { draft.stops = draft.stops === 0 ? null : 0; paintScales(); };
+  $("cPrice").oninput = paintSummary;
 
   $("dSearch").oninput = buildArchive;
   $("dAdd").onclick = () => { buildManualForm(); showScreen("screenM"); };
