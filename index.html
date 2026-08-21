@@ -111,17 +111,17 @@ html,body{
 }
 
 /* The task, in its amber frame — the second and last amber of the run.
-   Positioned under the block instead of sitting inside its flow: the place
-   has to own the middle of the crop alone for a beat, and a box reserving
-   its height would push the name up to make room for something that is not
-   there yet. #result then lifts by half this box plus the gap, so the pair
-   ends up centred exactly where the block used to sit. The 34px is RULE_GAP
-   in the script — change both. */
+   It is not part of the result block and never shares the screen with it:
+   the place holds the middle of the crop until he taps, then leaves, and the
+   task takes the same frame. So this centres itself, on the viewport, rather
+   than sitting under anything. */
 #rulebox{
-  position:absolute;left:26px;right:26px;top:100%;margin-top:34px;
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:calc(var(--crop) - 52px);max-width:calc(100vw - 52px);
   border:3px solid var(--nova);
   padding:20px 22px;
   display:flex;flex-direction:column;justify-content:center;
+  text-align:center;z-index:5;pointer-events:none;
   opacity:0;
   overflow:hidden;
 }
@@ -462,8 +462,12 @@ window.addEventListener("error", function (e) {
   <div class="pmeta" id="pmeta"></div>
   <div class="pcoord" id="pcoord"></div>
   <div class="pdist" id="pdist"></div>
-  <div id="rulebox"><div id="ruletext"></div><div id="rulezh"></div></div>
 </div>
+
+<!-- the task. A sibling of the result, not a child: the result is hidden by
+     dropping its opacity, and opacity on a parent takes the whole subtree
+     with it — a fixed-positioned child included. -->
+<div id="rulebox"><div id="ruletext"></div><div id="rulezh"></div></div>
 
 <div id="prompt">tap to spin</div>
 
@@ -1732,26 +1736,6 @@ function drawPositionMark() {
   ctx.stroke();
 }
 
-/* The hand-off lift — the place rising to make room for the task. Eased
-   here in the frame loop rather than with a CSS transition, because
-   applyShake writes #result's transform every frame and a transition on that
-   property would smear the shake into a wobble. */
-let lift = { from: 0, to: 0, at: 0, ms: 0, v: 0 };
-function setLift(px, ms) {
-  lift.from = lift.v;
-  lift.to = px;
-  lift.at = performance.now();
-  lift.ms = REDUCED ? 0 : ms;
-  if (!lift.ms) lift.v = px;
-}
-function liftNow(now) {
-  if (lift.ms > 0 && lift.v !== lift.to) {
-    const u = clamp01((now - lift.at) / lift.ms);
-    lift.v = lift.from + (lift.to - lift.from) * (1 - Math.pow(1 - u, 3));
-  }
-  return lift.v;
-}
-
 /* screen shake — 12 px on the nova, 7 px on the rule lock */
 let shake = { until: 0, mag: 0 };
 function kickShake(mag, ms) {
@@ -1760,12 +1744,12 @@ function kickShake(mag, ms) {
   shake.until = performance.now() + ms;
 }
 function applyShake(now) {
-  const stage = $("stage"), res = $("result");
-  // the lift rides underneath the shake, so both can happen at once
-  const base = `translate(-50%,calc(-50% - ${liftNow(now).toFixed(1)}px))`;
+  // the task box is its own fixed element now, so it has to be shaken by hand
+  const stage = $("stage"), res = $("result"), box = $("rulebox");
   if (now > shake.until) {
     stage.style.transform = "";
-    res.style.transform = base;
+    res.style.transform = "translate(-50%,-50%)";
+    box.style.transform = "translate(-50%,-50%)";
     return;
   }
   const left = (shake.until - now) / 340;
@@ -1773,7 +1757,9 @@ function applyShake(now) {
   const dx = (Math.random() * 2 - 1) * m;
   const dy = (Math.random() * 2 - 1) * m;
   stage.style.transform = `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
-  res.style.transform = `${base} translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
+  const t = `translate(-50%,-50%) translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
+  res.style.transform = t;
+  box.style.transform = t;
 }
 
 /* ================================================================= sound
@@ -1867,6 +1853,7 @@ const audio = {
   },
 
   nova() { this.sweep(120, 38, 500, 0.5); },        // felt more than heard
+  swap() { this.sweep(180, 120, 180, 0.13); },      // the place closing, quiet
   ruleLock() { this.sweep(260, 96, 320, 0.32); },   // shorter, higher, a sibling
 };
 
@@ -1882,10 +1869,13 @@ const T = {
   APPROACH_TO: 3400,
   THREE_TO: 5200,
   LOCK: 5200,
-  SILENCE_TO: 5900,   // the silence ends: the place lifts, alone, for 540 ms
-  HANDOFF_MS: 540,
-  RULE_FROM: 6160,    // the frame opens beneath it, into space already moving
-  RULE_TO: 7500,
+  SILENCE_TO: 5900,   // the silence ends: the place is held out, and asks
+  COORD_TO: 7250,     // the coordinates land, if the tap has not come first
+  /* and from the tap, not from the spin — the second half of the result is
+     his to time, so that he can read the name out before asking for the task */
+  SWAP_OUT: 300,      // the place closes to a line
+  SWAP_GAP: 90,       // an empty frame
+  RULE_MS: 1340,      // the task cycles, decelerating, and locks
 };
 /* The choosing beat. Three finalists were not enough to read as a decision
    when each lit exactly once: the eye saw a countdown, not a choice. So the
@@ -1926,7 +1916,7 @@ const spin = {
   ruleLockedAt: null,
   ruleFinal: null,
   ruleShown: null,
-  ruleH: 0,
+  revealAt: null,
   tapPoint: null,
   nextTickAt: 0,
   record: null,
@@ -2022,6 +2012,7 @@ const spin = {
     this.phase = "eliminating";
     this.lockedAt = null;
     this.ruleLockedAt = null;
+    this.revealAt = null;
     this.ruleFinal = pickRule(V.cat[this.winner]);
     this.ruleShown = null;
     this.nextTickAt = this.t0 + T.EXTINCT_FROM;
@@ -2047,7 +2038,7 @@ const spin = {
 
     setPrompt("");
     hideResult();
-    this.ruleH = ruleBoxHeight();
+    ruleBoxHeight();
     return true;
   },
 
@@ -2086,52 +2077,89 @@ const spin = {
     if (this.phase === "locked") {
       updateCoordCount(now);
       if (el >= T.SILENCE_TO) {
-        /* The hand-off. The place has had the middle of the frame to itself
-           for the whole silence; it now rises by exactly the room the task
-           will need, and the task arrives into a space that is already
-           opening rather than on top of a name still holding the centre. */
-        this.phase = "rule";
-        setLift((RULE_GAP + this.ruleH) / 2, T.HANDOFF_MS);
+        /* The place has had the middle of the frame to itself for the whole
+           silence, and it keeps it. The task is not shown until he asks for
+           it: the two halves of the result never share the screen, and the
+           second one lands when he is ready to film it, not on a timer. */
+        this.phase = "held";
+        setPrompt("tap for the task");
+        wipeIn($("prompt"));
       }
       return;
     }
 
-    if (this.phase === "rule") {
+    // Nothing here times out. The place holds until he taps, however long
+    // that takes on set — the record is already written, so a run that ends
+    // here is a trip that can still be rated.
+    if (this.phase === "held") {
       updateCoordCount(now);
-      // the place is still travelling — nothing else is on screen yet
-      if (el < T.RULE_FROM) return;
-      const box = $("rulebox");
+      return;
+    }
+
+    /* The swap, timed from his tap: the place closes to a line the way it
+       opened, the frame is empty for a beat, and the task takes it. */
+    if (this.phase === "revealing") {
+      const rel = now - this.revealAt;
+      const OUT = REDUCED ? 0 : T.SWAP_OUT;
+      const GAP = REDUCED ? 0 : T.SWAP_GAP;
+      const res = $("result"), box = $("rulebox");
+
+      if (rel < OUT) {
+        const u = clamp01(rel / OUT);
+        const e = (u * u * 50).toFixed(2);   // accelerating shut
+        res.style.clipPath = `inset(0 ${e}% 0 ${e}%)`;
+        return;
+      }
+      if (res.classList.contains("on")) {
+        res.classList.remove("on");
+        res.style.clipPath = "";
+      }
+      if (rel < OUT + GAP) return;
+
+      const rel2 = rel - OUT - GAP;
       if (!box.classList.contains("on")) {
         box.classList.add("on");
         wipeIn(box);
       }
-      if (el < T.RULE_TO) {
+      if (rel2 < T.RULE_MS) {
         if (REDUCED) {
           if (this.ruleShown !== this.ruleFinal) showRule(this.ruleFinal);
         } else {
           // cycling, decelerating: the interval grows so the last few land
           // one at a time. Nothing under 200 ms — a filmed screen strobes.
-          const u = clamp01((el - T.RULE_FROM) / (T.RULE_TO - T.RULE_FROM));
+          const u = clamp01(rel2 / T.RULE_MS);
           const step = 200 + 420 * u * u;
-          const idx = Math.floor((el - T.RULE_FROM) / step);
+          const idx = Math.floor(rel2 / step);
           if (this._lastRuleIdx !== idx) {
             this._lastRuleIdx = idx;
             showRule(D.rules[secureRandom(D.rules.length)]);
           }
         }
       } else {
-        updateCoordCount(now); // land exactly on the real value, not near it
         showRule(this.ruleFinal);
         this.ruleLockedAt = now;
         this.phase = "resting";
         audio.ruleLock();
         kickShake(7, 340);
-        wipeIn($("rulebox"));
+        wipeIn(box);
         setPrompt("rate it when you get back");
-        persistPending();
+        persistPending();   // now with the rule on it
       }
       return;
     }
+  },
+
+  /* His tap, not a timer. The task itself was drawn at the spin, from a CSP
+     random source, before a pixel moved — asking for it later cannot change
+     what it is. */
+  reveal(now) {
+    if (this.phase !== "held") return false;
+    this.phase = "revealing";
+    this.revealAt = now;
+    landCoords();   // nothing is left mid-count when the place walks off
+    setPrompt("");
+    audio.swap();
+    return true;
   },
 
   approach() {
@@ -2176,6 +2204,10 @@ const spin = {
       at: now,
     };
     showResult(this.winner);
+    /* Written here rather than at the task, because the task now waits for a
+       tap that may never come. A record with rule:null is a trip that can
+       still be rated; one that was never written is a trip that vanished. */
+    persistPending();
   },
 };
 
@@ -2286,6 +2318,7 @@ function setPrompt(text) {
 
 function hideResult() {
   $("result").classList.remove("on");
+  $("result").style.clipPath = "";
   const box = $("rulebox");
   box.classList.remove("on");
   box.style.height = "";
@@ -2293,16 +2326,14 @@ function hideResult() {
   $("rulezh").textContent = "";
   spin.ruleShown = null;
   spin._lastRuleIdx = -1;
-  setLift(0, 0);   // the place drops back to the middle of the crop
 }
 
 /* The frame is measured against every rule there is and fixed at the height
-   of the tallest, before the run starts. Two reasons. The place is lifted by
-   half of it, so a box that grew as the shuffle cycled would drag the name up
-   and down with it. And a height that is the same for all sixteen rules is
-   the same in every video: the end frame of a spin is composed identically
-   whichever task comes up, which is what a title card has to do. */
-const RULE_GAP = 34;   // matches #rulebox margin-top in the stylesheet
+   of the tallest, before the run starts: a box that grew as the shuffle
+   cycled would jump about the middle of the screen, and a height that is the
+   same for all sixteen rules is the same in every video — the task card is
+   composed identically whichever task comes up, which is what a title card
+   has to do. */
 function ruleBoxHeight() {
   const box = $("rulebox");
   box.style.height = "auto";
@@ -2360,15 +2391,22 @@ function plural(n, one, many) {
 
 /* Coordinates count up to their final value rather than appearing. Tabular
    numerals, so nothing shifts width while it counts. */
+function setCoordText(lat, lng) {
+  $("pcoord").textContent =
+    lat.toFixed(5) + "  " + lng.toFixed(5) + "   WGS-84";
+}
 function updateCoordCount(now) {
   const wi = spin.winner;
   if (wi < 0 || !spin.coordFrom) return;
-  const u = clamp01((now - spin.coordFrom.at) / (T.RULE_TO - T.LOCK));
+  const u = clamp01((now - spin.coordFrom.at) / (T.COORD_TO - T.LOCK));
   const e = 1 - Math.pow(1 - u, 3);
-  const lat = spin.coordFrom.lat + (V.lat[wi] - spin.coordFrom.lat) * e;
-  const lng = spin.coordFrom.lng + (V.lng[wi] - spin.coordFrom.lng) * e;
-  $("pcoord").textContent =
-    lat.toFixed(5) + "  " + lng.toFixed(5) + "   WGS-84";
+  setCoordText(spin.coordFrom.lat + (V.lat[wi] - spin.coordFrom.lat) * e,
+               spin.coordFrom.lng + (V.lng[wi] - spin.coordFrom.lng) * e);
+}
+// land exactly on the real value, not near it
+function landCoords() {
+  const wi = spin.winner;
+  if (wi >= 0) setCoordText(V.lat[wi], V.lng[wi]);
 }
 
 function showRule(rule) {
@@ -2392,7 +2430,7 @@ function persistPending() {
     // a re-roll replaces the pending record rather than leaving a ghost
     Object.assign(spin.record, {
       placeId: v.id, place: v, rule: spin.ruleShown,
-      spunAt: iso(now),
+      spunAt: spin.record.spunAt || iso(now),   // the spin, not this write
       fromLat: filters.pos ? filters.pos.lat : null,
       fromLng: filters.pos ? filters.pos.lng : null,
       distanceKm: km == null ? null : Math.round(km * 10) / 10,
@@ -3150,6 +3188,13 @@ function handleTap(px, py) {
     return;
   }
 
+  // the tap that asks for the task. Not a re-roll, and not interruptible:
+  // what it reveals was decided at the spin.
+  if (spin.phase === "held") {
+    spin.reveal(performance.now());
+    return;
+  }
+
   if (spin.phase === "resting") {
     // A re-roll exists only behind an explicit confirm, and it is logged.
     dialog({
@@ -3300,6 +3345,9 @@ function lastUnrated() {
    got. This is why a viewer watches to the end. DESIGN.md §8 */
 const TARGET_PLACES = 500;
 function playOutro() {
+  // the run is over: a task never asked for is never asked for, and a later
+  // tap must reach the re-roll confirm rather than reviving a dead reveal
+  if (spin.phase === "held" || spin.phase === "revealing") spin.phase = "resting";
   hideResult();
   setPrompt("");
   cityView(true);

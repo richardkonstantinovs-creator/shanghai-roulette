@@ -9,7 +9,7 @@
  * Bump CACHE when the data is rebuilt, or devices will keep serving the old
  * map from their own copy.
  */
-const CACHE = "shanghai-roulette-8e2a39b7a9";
+const CACHE = "shanghai-roulette-d348c238d4";
 
 const ASSETS = [
   "./",
