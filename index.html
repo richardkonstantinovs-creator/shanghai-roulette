@@ -186,6 +186,13 @@ body.hideui .corner,body.hideui #prompt{display:none;}
 .hrow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex:0 0 auto;}
 
 .section{margin-top:22px;flex:0 0 auto;}
+/* Every section on the filter screen is the same skeleton: a label row
+   carrying its own summary and shortcuts, then the choices. An engraved
+   rule divides them, so four unlike controls read as one instrument. */
+.section.ruled{
+  border-top:3px solid rgba(127,169,196,.15);
+  padding-top:19px;margin-top:19px;
+}
 .slabel{
   font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.32em;
   text-transform:uppercase;color:var(--engrave);opacity:.6;margin-bottom:10px;
@@ -199,24 +206,52 @@ body.hideui .corner,body.hideui #prompt{display:none;}
   display:inline-flex;align-items:center;
 }
 .chip:active{border-color:rgba(240,226,200,.4);}
-.chip.on{color:var(--rubbing);border-color:rgba(240,226,200,.55);background:rgba(240,226,200,.06);}
+.chip.on{color:var(--rubbing);border-color:rgba(240,226,200,.55);background:rgba(240,226,200,.07);}
 /* an unselected chip that still has nothing behind it is not worth a tap.
    Not ".empty" — that name is already the archive's empty-state block, and
    an unqualified class later in this sheet wins the font off the chip. */
 .chip.nil{opacity:.34;}
-.chip .n{opacity:.45;margin-left:9px;font-weight:500;}
+.chip .n{opacity:.5;margin-left:9px;font-weight:500;}
 /* the all / none pair — small enough to read as a control, not a choice */
-.chip.mini{padding:7px 11px;min-height:0;font-size:10px;letter-spacing:.16em;}
+.chip.mini{padding:8px 13px;min-height:34px;font-size:10px;letter-spacing:.16em;}
+
+/* The two long lists. A grid, not a wrap: fifteen chips at fifteen widths
+   leave a ragged edge and scatter the counts, so there is no column to read
+   down. Uniform cells put every number in the same place, and the holes a
+   deselected chip leaves become legible as holes. */
+.chips.grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(166px,1fr));gap:8px;
+}
+.chips.grid .chip{padding:0 14px;min-height:46px;letter-spacing:.1em;}
+.chips.grid .chip .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.chips.grid .chip .n{margin-left:auto;padding-left:10px;}
+
+/* Radius is one choice out of four, so it gets a segmented control rather
+   than four loose chips — the shape says "pick one" before the label does.
+   The borders overlap by their own width so the dividers stay 3 px. */
+.chips.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:0;}
+.chips.seg .chip{justify-content:center;padding:0 8px;min-height:52px;position:relative;}
+.chips.seg .chip + .chip{margin-left:-3px;}
+.chips.seg .chip.on{z-index:1;}
+
+/* the position row: one action that fills the width, its two modifiers held
+   to their own size, so it lines up with the radius control beneath it */
+.chips.row{flex-wrap:nowrap;gap:8px;}
+.chips.row .chip{flex:0 0 auto;}
+.chips.row .chip.grow{flex:1 1 auto;justify-content:center;min-width:0;}
 
 /* the row a section label shares with its summary and its shortcuts */
 .srow{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.srow .slabel{margin-bottom:0;}
+.srow .slabel{margin-bottom:0;flex:0 0 auto;}
 .ssel{
   font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.18em;
-  color:var(--rubbing);opacity:.72;margin-right:auto;white-space:nowrap;
+  color:var(--rubbing);opacity:.72;margin-right:auto;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
 }
+/* a filter that excludes nothing is not doing anything — say so quietly, so
+   the one summary that is bright is the one that is actually cutting */
+.ssel.full{color:var(--engrave);opacity:.42;}
 .ssel.warn{color:var(--nova);opacity:1;}
-.hsub.warnline{color:var(--nova);opacity:.95;}
 
 /* only the middle of the filter screen scrolls; the count stays in reach.
    The negative margin lets the scrollbar and the tap targets run to the
@@ -226,21 +261,24 @@ body.hideui .corner,body.hideui #prompt{display:none;}
   margin:0 -22px;padding:0 22px;
 }
 .afoot{
-  display:flex;align-items:center;gap:16px;flex:0 0 auto;
-  padding-top:16px;margin-top:2px;
-  border-top:3px solid rgba(127,169,196,.16);
+  display:flex;align-items:center;gap:18px;flex:0 0 auto;
+  padding-top:18px;margin-top:6px;
+  border-top:3px solid rgba(127,169,196,.28);
 }
 .afoot .acount{flex:1 1 auto;min-width:0;}
-.afoot .btn.primary{flex:0 0 auto;padding:20px 26px;font-size:13px;}
+.afoot .btn.primary{
+  flex:0 0 auto;min-width:236px;text-align:center;
+  padding:22px 26px;font-size:13px;letter-spacing:.26em;
+}
 
 /* the count, and the spin button that it disables */
 #countline{
-  font-family:var(--display);font-size:clamp(26px,3.4vw,38px);font-weight:600;
+  font-family:var(--display);font-size:clamp(30px,4vw,44px);font-weight:600;
   color:var(--rubbing);letter-spacing:-.01em;line-height:1;
 }
 #countline.zero{color:var(--nova);}
-#counthint{font-family:var(--utility);font-size:11px;letter-spacing:.18em;
-  text-transform:uppercase;opacity:.55;margin-top:7px;}
+#counthint{font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.22em;
+  text-transform:uppercase;opacity:.55;margin-top:8px;}
 
 .spacer{flex:1 1 auto;min-height:12px;}
 .footrow{display:flex;gap:10px;flex:0 0 auto;padding-top:18px;}
@@ -451,43 +489,43 @@ window.addEventListener("error", function (e) {
     <div class="section">
       <div class="srow">
         <div class="slabel">where you are</div>
+        <span class="ssel" id="posInfo">not set</span>
       </div>
-      <div class="chips">
-        <button class="chip" id="bPickHere">i&#39;m here — mark on the map</button>
+      <div class="chips row">
+        <button class="chip grow" id="bPickHere">i&#39;m here — mark on the map</button>
         <button class="chip" id="bGps">gps</button>
         <button class="chip" id="bClearPos">clear</button>
       </div>
-      <div class="hsub" id="posInfo" style="margin-top:10px">position not set</div>
     </div>
 
-    <div class="section">
+    <div class="section ruled">
       <div class="srow">
         <div class="slabel">radius</div>
         <span class="ssel" id="radSel"></span>
       </div>
-      <div class="chips" id="radiusChips"></div>
+      <div class="chips seg" id="radiusChips"></div>
     </div>
 
-    <div class="section">
+    <div class="section ruled">
       <div class="srow">
         <div class="slabel">categories</div>
         <span class="ssel" id="catSel"></span>
         <button class="chip mini" id="catAll">all</button>
         <button class="chip mini" id="catNone">none</button>
       </div>
-      <div class="chips" id="catChips"></div>
+      <div class="chips grid" id="catChips"></div>
     </div>
 
-    <div class="section">
+    <div class="section ruled">
       <div class="srow">
         <div class="slabel">districts</div>
         <span class="ssel" id="distSel"></span>
         <button class="chip mini" id="distAll">all</button>
         <button class="chip mini" id="distNone">none</button>
       </div>
-      <div class="chips" id="distChips"></div>
+      <div class="chips grid" id="distChips"></div>
     </div>
-    <div style="height:8px"></div>
+    <div style="height:10px"></div>
   </div>
 
   <div class="afoot">
@@ -2400,7 +2438,10 @@ function buildScreenA() {
     const n = counts.byCat.get(c.id) || 0;
     const b = document.createElement("button");
     b.className = "chip" + (on ? " on" : "") + (!on && n === 0 ? " nil" : "");
-    b.appendChild(document.createTextNode(c.en || c.ru || c.id));
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = c.en || c.ru || c.id;
+    b.appendChild(name);
     const tag = document.createElement("span");
     tag.className = "n";
     tag.textContent = n;
@@ -2421,7 +2462,10 @@ function buildScreenA() {
     const n = counts.byDist.get(d.name) || 0;
     const b = document.createElement("button");
     b.className = "chip" + (on ? " on" : "") + (!on && n === 0 ? " nil" : "");
-    b.appendChild(document.createTextNode(d.name));
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = d.name;
+    b.appendChild(name);
     const tag = document.createElement("span");
     tag.className = "n";
     tag.textContent = n;
@@ -2441,15 +2485,20 @@ function buildScreenA() {
   const radSel = $("radSel");
   radSel.textContent = radLive ? "needs a position" : (rad ? rad.label : "");
   radSel.classList.toggle("warn", radLive);
-  $("catSel").textContent = filters.cats.length + " / " + CATEGORIES.length;
-  $("distSel").textContent = filters.dists.length + " / " + DISTRICTS.length;
+  const catSel = $("catSel");
+  catSel.textContent = filters.cats.length + " / " + CATEGORIES.length;
+  catSel.classList.toggle("full", filters.cats.length === CATEGORIES.length);
+  const distSel = $("distSel");
+  distSel.textContent = filters.dists.length + " / " + DISTRICTS.length;
+  distSel.classList.toggle("full", filters.dists.length === DISTRICTS.length);
   const posInfo = $("posInfo");
   posInfo.textContent = filters.pos
-    ? "position: " + filters.pos.lat.toFixed(4) + ", " + filters.pos.lng.toFixed(4)
+    ? filters.pos.lat.toFixed(4) + ", " + filters.pos.lng.toFixed(4)
     : radLive
-      ? "position not set — the radius does nothing until it is"
-      : "position not set";
-  posInfo.classList.toggle("warnline", radLive);
+      ? "not set — the radius needs one"
+      : "not set";
+  posInfo.classList.toggle("warn", radLive);
+  posInfo.classList.toggle("full", !filters.pos && !radLive);
   $("bGps").style.display = navigator.geolocation ? "" : "none";
   $("bClearPos").style.display = filters.pos ? "" : "none";
   updateCount();
