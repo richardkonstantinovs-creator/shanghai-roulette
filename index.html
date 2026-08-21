@@ -101,11 +101,18 @@ html,body{
   letter-spacing:.1em;color:var(--rubbing);opacity:.85;margin-top:8px;
 }
 
-/* the rule, in its amber frame — the second and last amber of the run */
+/* The task, in its amber frame — the second and last amber of the run.
+   Positioned under the block instead of sitting inside its flow: the place
+   has to own the middle of the crop alone for a beat, and a box reserving
+   its height would push the name up to make room for something that is not
+   there yet. #result then lifts by half this box plus the gap, so the pair
+   ends up centred exactly where the block used to sit. The 34px is RULE_GAP
+   in the script — change both. */
 #rulebox{
-  margin:30px auto 0;max-width:100%;
+  position:absolute;left:26px;right:26px;top:100%;margin-top:34px;
   border:3px solid var(--nova);
   padding:20px 22px;
+  display:flex;flex-direction:column;justify-content:center;
   opacity:0;
   overflow:hidden;
 }
@@ -1716,6 +1723,26 @@ function drawPositionMark() {
   ctx.stroke();
 }
 
+/* The hand-off lift — the place rising to make room for the task. Eased
+   here in the frame loop rather than with a CSS transition, because
+   applyShake writes #result's transform every frame and a transition on that
+   property would smear the shake into a wobble. */
+let lift = { from: 0, to: 0, at: 0, ms: 0, v: 0 };
+function setLift(px, ms) {
+  lift.from = lift.v;
+  lift.to = px;
+  lift.at = performance.now();
+  lift.ms = REDUCED ? 0 : ms;
+  if (!lift.ms) lift.v = px;
+}
+function liftNow(now) {
+  if (lift.ms > 0 && lift.v !== lift.to) {
+    const u = clamp01((now - lift.at) / lift.ms);
+    lift.v = lift.from + (lift.to - lift.from) * (1 - Math.pow(1 - u, 3));
+  }
+  return lift.v;
+}
+
 /* screen shake — 12 px on the nova, 7 px on the rule lock */
 let shake = { until: 0, mag: 0 };
 function kickShake(mag, ms) {
@@ -1725,9 +1752,11 @@ function kickShake(mag, ms) {
 }
 function applyShake(now) {
   const stage = $("stage"), res = $("result");
+  // the lift rides underneath the shake, so both can happen at once
+  const base = `translate(-50%,calc(-50% - ${liftNow(now).toFixed(1)}px))`;
   if (now > shake.until) {
     stage.style.transform = "";
-    res.style.transform = "translate(-50%,-50%)";
+    res.style.transform = base;
     return;
   }
   const left = (shake.until - now) / 340;
@@ -1735,7 +1764,7 @@ function applyShake(now) {
   const dx = (Math.random() * 2 - 1) * m;
   const dy = (Math.random() * 2 - 1) * m;
   stage.style.transform = `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
-  res.style.transform = `translate(-50%,-50%) translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
+  res.style.transform = `${base} translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
 }
 
 /* ================================================================= sound
@@ -1844,8 +1873,10 @@ const T = {
   APPROACH_TO: 3400,
   THREE_TO: 5200,
   LOCK: 5200,
-  SILENCE_TO: 5900,
-  RULE_TO: 7250,
+  SILENCE_TO: 5900,   // the silence ends: the place lifts, alone, for 540 ms
+  HANDOFF_MS: 540,
+  RULE_FROM: 6160,    // the frame opens beneath it, into space already moving
+  RULE_TO: 7500,
 };
 /* The choosing beat. Three finalists were not enough to read as a decision
    when each lit exactly once: the eye saw a countdown, not a choice. So the
@@ -1886,6 +1917,7 @@ const spin = {
   ruleLockedAt: null,
   ruleFinal: null,
   ruleShown: null,
+  ruleH: 0,
   tapPoint: null,
   nextTickAt: 0,
   record: null,
@@ -2006,6 +2038,7 @@ const spin = {
 
     setPrompt("");
     hideResult();
+    this.ruleH = ruleBoxHeight();
     return true;
   },
 
@@ -2044,23 +2077,34 @@ const spin = {
     if (this.phase === "locked") {
       updateCoordCount(now);
       if (el >= T.SILENCE_TO) {
+        /* The hand-off. The place has had the middle of the frame to itself
+           for the whole silence; it now rises by exactly the room the task
+           will need, and the task arrives into a space that is already
+           opening rather than on top of a name still holding the centre. */
         this.phase = "rule";
-        $("rulebox").classList.add("on");
+        setLift((RULE_GAP + this.ruleH) / 2, T.HANDOFF_MS);
       }
       return;
     }
 
     if (this.phase === "rule") {
       updateCoordCount(now);
+      // the place is still travelling — nothing else is on screen yet
+      if (el < T.RULE_FROM) return;
+      const box = $("rulebox");
+      if (!box.classList.contains("on")) {
+        box.classList.add("on");
+        wipeIn(box);
+      }
       if (el < T.RULE_TO) {
         if (REDUCED) {
           if (this.ruleShown !== this.ruleFinal) showRule(this.ruleFinal);
         } else {
           // cycling, decelerating: the interval grows so the last few land
           // one at a time. Nothing under 200 ms — a filmed screen strobes.
-          const u = clamp01((el - T.SILENCE_TO) / (T.RULE_TO - T.SILENCE_TO));
+          const u = clamp01((el - T.RULE_FROM) / (T.RULE_TO - T.RULE_FROM));
           const step = 200 + 420 * u * u;
-          const idx = Math.floor((el - T.SILENCE_TO) / step);
+          const idx = Math.floor((el - T.RULE_FROM) / step);
           if (this._lastRuleIdx !== idx) {
             this._lastRuleIdx = idx;
             showRule(D.rules[secureRandom(D.rules.length)]);
@@ -2233,11 +2277,35 @@ function setPrompt(text) {
 
 function hideResult() {
   $("result").classList.remove("on");
-  $("rulebox").classList.remove("on");
+  const box = $("rulebox");
+  box.classList.remove("on");
+  box.style.height = "";
   $("ruletext").textContent = "";
   $("rulezh").textContent = "";
   spin.ruleShown = null;
   spin._lastRuleIdx = -1;
+  setLift(0, 0);   // the place drops back to the middle of the crop
+}
+
+/* The frame is measured against every rule there is and fixed at the height
+   of the tallest, before the run starts. Two reasons. The place is lifted by
+   half of it, so a box that grew as the shuffle cycled would drag the name up
+   and down with it. And a height that is the same for all sixteen rules is
+   the same in every video: the end frame of a spin is composed identically
+   whichever task comes up, which is what a title card has to do. */
+const RULE_GAP = 34;   // matches #rulebox margin-top in the stylesheet
+function ruleBoxHeight() {
+  const box = $("rulebox");
+  box.style.height = "auto";
+  let h = 0;
+  for (const r of D.rules || []) {
+    showRule(r);
+    h = Math.max(h, box.offsetHeight);
+  }
+  showRule({ en: "", zh: "" });
+  spin.ruleShown = null;
+  box.style.height = h + "px";
+  return h;
 }
 
 function wipeIn(el) {
