@@ -95,6 +95,58 @@ small{display:block;margin-top:22px;opacity:.6;font-size:13px;line-height:1.6;wo
   line("files (export)", (typeof Blob !== "undefined" && typeof URL !== "undefined" && URL.createObjectURL) ? "yes" : "NO",
        typeof Blob !== "undefined" && !!(URL && URL.createObjectURL));
 
+  // the camera button on the rating screen
+  var capOk = "capture" in document.createElement("input");
+  line("camera capture", capOk ? "yes" : "NO — the library opens instead", capOk);
+
+  // photographs live in IndexedDB, and a blob has to survive the round trip
+  line("photo storage", "checking…", true);
+  var photoRow = rows.lastChild;
+  function setPhoto(text, good) {
+    photoRow.innerHTML = "<b>photo storage</b><span class='" + (good ? "ok" : "bad") + "'>" + text + "</span>";
+  }
+  try {
+    var req = indexedDB.open("sh-check", 1);
+    req.onupgradeneeded = function () { req.result.createObjectStore("m", { keyPath: "id" }); };
+    req.onerror = function () { setPhoto("NO — " + (req.error && req.error.name), false); };
+    req.onsuccess = function () {
+      var db = req.result;
+      try {
+        var tx = db.transaction("m", "readwrite");
+        tx.objectStore("m").put({ id: "a", blob: new Blob([new Uint8Array(2048)], { type: "image/jpeg" }) });
+        tx.oncomplete = function () {
+          var rd = db.transaction("m").objectStore("m").get("a");
+          rd.onsuccess = function () {
+            var ok = rd.result && rd.result.blob && rd.result.blob.size === 2048;
+            setPhoto(ok ? "yes" : "NO — the file came back wrong", !!ok);
+            try { indexedDB.deleteDatabase("sh-check"); } catch (e) {}
+          };
+        };
+        tx.onerror = function () { setPhoto("NO — " + (tx.error && tx.error.name), false); };
+      } catch (e) { setPhoto("NO — " + e.name, false); }
+    };
+  } catch (e) { setPhoto("NO — " + e.name, false); }
+
+  // and iOS must be told not to evict them
+  if (navigator.storage && navigator.storage.estimate) {
+    line("space", "checking…", true);
+    var spaceRow = rows.lastChild;
+    navigator.storage.estimate().then(function (est) {
+      var mb = function (b) { return Math.round((b || 0) / 1048576) + " MB"; };
+      spaceRow.innerHTML = "<b>space</b><span class='ok'>" + mb(est.usage) + " used of " + mb(est.quota) + "</span>";
+    }).catch(function () { spaceRow.innerHTML = "<b>space</b><span class='bad'>unknown</span>"; });
+  } else {
+    line("space", "cannot be measured here", false);
+  }
+  if (navigator.storage && navigator.storage.persisted) {
+    line("photos kept safe", "checking…", true);
+    var persistRow = rows.lastChild;
+    navigator.storage.persisted().then(function (p) {
+      persistRow.innerHTML = "<b>photos kept safe</b><span class='" + (p ? "ok" : "bad") + "'>" +
+        (p ? "yes — never evicted" : "not yet — the app asks on the first photo") + "</span>";
+    }).catch(function () {});
+  }
+
   var t0 = performance.now(), n = 0;
   (function loop() {
     n++;

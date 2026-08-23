@@ -428,6 +428,129 @@ body.hideui .corner,body.hideui #prompt{display:none;}
 select.field{-webkit-appearance:none;appearance:none;}
 select.field option{background:var(--ink);color:var(--rubbing);}
 
+/* -------------------------------------------------------- media capture
+   Three slots under the score, and nothing here can block a save: the
+   button above is already enabled before any of this is touched. The
+   thumbnail is the whole control — it is the only proof the shot came out,
+   and it has to appear while he is still standing in the restaurant.
+   FEATURE-MEDIA §4.1 */
+.mstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.mslot{
+  position:relative;aspect-ratio:1/1;min-height:104px;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:rgba(6,17,28,.6);border:3px solid rgba(127,169,196,.2);
+  padding:10px;cursor:pointer;text-align:center;
+  font-family:var(--utility);font-size:10px;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--engrave);
+}
+.mslot .plus{font-family:var(--display);font-size:30px;font-weight:400;line-height:1;opacity:.5;}
+.mslot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+/* the label rides over the photograph rather than beside it: at this size a
+   caption row would halve the picture and the picture is the confirmation */
+.mslot .lab{position:relative;z-index:1;}
+.mslot.has{border-color:rgba(240,226,200,.5);}
+.mslot.has .lab{
+  position:absolute;left:0;right:0;bottom:0;z-index:1;
+  padding:8px 6px;background:rgba(6,17,28,.82);color:var(--rubbing);
+}
+.mslot .cnt{
+  position:absolute;top:0;right:0;z-index:1;padding:7px 9px;
+  background:rgba(6,17,28,.82);color:var(--nova);letter-spacing:.12em;
+}
+.mslot.busy{border-color:rgba(255,176,58,.5);color:var(--nova);}
+.mslot.off{opacity:.4;cursor:default;}
+
+/* the menu runs to several pages, so it gets a strip of its own under the
+   three slots — a page is managed where it is seen, not through the slot */
+.mpages{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.mpage{
+  position:relative;width:74px;height:74px;overflow:hidden;cursor:pointer;
+  border:3px solid rgba(127,169,196,.2);background:rgba(6,17,28,.6);
+}
+.mpage img{width:100%;height:100%;object-fit:cover;}
+.mpage b{
+  position:absolute;left:0;bottom:0;padding:3px 6px;background:rgba(6,17,28,.82);
+  font-family:var(--utility);font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--rubbing);
+}
+.mnote{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--engrave);opacity:.45;margin-top:12px;line-height:1.7;
+}
+.mnote.warn{color:var(--nova);opacity:1;}
+
+/* ---------------------------------------------------------- order card
+   The thing the guide site actually sells: four or five dishes a stranger
+   can point at. Chinese first and largest — it is the line that gets shown
+   to the waiter. FEATURE-MEDIA §5 */
+.ocard{border:3px solid rgba(240,226,200,.28);padding:16px 18px;margin-top:4px;}
+.ocdish{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:9px 0;}
+.ocdish + .ocdish{border-top:3px solid rgba(127,169,196,.12);}
+.ocdish .zh{font-family:var(--cjk);font-size:19px;font-weight:600;letter-spacing:.06em;color:var(--rubbing);}
+.ocdish .py{font-family:var(--utility);font-size:11px;letter-spacing:.1em;color:var(--engrave);opacity:.7;}
+.ocdish .en{font-family:var(--display);font-size:15px;color:var(--engrave);flex:1 1 140px;min-width:0;}
+.ocdish .pr{font-family:var(--utility);font-size:14px;font-weight:700;color:var(--nova);margin-left:auto;}
+.occhecked{
+  font-family:var(--utility);font-size:10px;font-weight:700;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--engrave);opacity:.5;margin-top:13px;
+}
+/* a price with no date is worse than no price — when it goes stale it says so */
+.occhecked.stale{color:var(--nova);opacity:1;}
+.ocnote{
+  font-family:var(--display);font-size:15px;line-height:1.5;color:var(--rubbing);
+  opacity:.85;margin-top:11px;
+}
+.ocnone{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--engrave);opacity:.45;line-height:1.8;
+}
+/* the editor. Desktop only — §2.4, no keyboard on the phone. */
+.ocrow{
+  display:grid;grid-template-columns:1.2fr 1fr 1.2fr 90px 52px;gap:8px;
+  margin-bottom:8px;align-items:center;
+}
+.ocrow .field{font-size:16px;min-height:48px;padding:11px 12px;}
+.ocrow .zh{font-family:var(--cjk);}
+.ocrow .x{
+  min-height:48px;font-size:16px;color:var(--engrave);
+  background:transparent;border:3px solid rgba(127,169,196,.2);cursor:pointer;
+}
+@media (max-width:720px){ .ocrow{grid-template-columns:1fr 1fr;} }
+
+/* ------------------------------------------------- backup and the queue
+   Eviction is real and a photograph cannot be retaken, so the archive says
+   what is not yet off the device. Never the map screen — that gets filmed.
+   FEATURE-MEDIA §7 */
+.bkbar{
+  display:none;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;
+  border:3px solid rgba(255,176,58,.45);padding:14px 16px;
+}
+.bkbar.on{display:flex;}
+.bkbar .txt{
+  flex:1 1 180px;min-width:0;
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--nova);line-height:1.7;
+}
+.arcitem .tags{flex:0 0 auto;display:flex;gap:7px;}
+.arcitem .tag{
+  font-family:var(--utility);font-size:10px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--engrave);opacity:.5;
+  border:3px solid rgba(127,169,196,.2);padding:3px 7px;
+}
+.arcitem .tag.card{color:var(--rubbing);opacity:.85;border-color:rgba(240,226,200,.35);}
+/* not yet off the device. Amber is spent on the nova and the rule on the
+   filmed screen; the archive is never filmed, and this is the one thing in
+   it that is asking for something. */
+.arcitem .tag.hot{color:var(--nova);opacity:.9;border-color:rgba(255,176,58,.4);}
+
+/* one download at a time, with the count visible: thirty <a download> clicks
+   in a loop silently drop most of the files on iOS. FEATURE-MEDIA §6.2 */
+.expq .n{font-family:var(--display);font-size:26px;color:var(--rubbing);}
+.expq .bar{height:9px;background:rgba(127,169,196,.18);margin-top:14px;}
+.expq .bar i{display:block;height:100%;background:var(--rubbing);width:0;}
+.expq .fail{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--nova);margin-top:14px;line-height:1.8;
+}
 /* ------------------------------------------------------------- archive */
 #arclist{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-top:14px;}
 .arcitem{
@@ -700,6 +823,30 @@ window.addEventListener("error", function (e) {
     </div>
   </div>
 
+  <!-- the evidence. Optional, always: the score above saves with none of it,
+       in the same number of taps it always did. FEATURE-MEDIA §2 -->
+  <div class="section ruled" id="cMediaSec">
+    <div class="srow">
+      <div class="slabel">photographs</div>
+      <div class="readout" id="cMediaOut"></div>
+    </div>
+    <div class="mstrip" id="cMedia"></div>
+    <div class="mpages" id="cMenuPages"></div>
+    <div class="mnote" id="cMediaNote"></div>
+  </div>
+
+  <!-- the order card: three to five dishes he can point at. Written at home
+       on a laptop and pushed back in through import, shown here so that the
+       second visit starts from what worked. FEATURE-MEDIA §5 -->
+  <div class="section ruled" id="cOrderSec">
+    <div class="srow">
+      <div class="slabel">order card</div>
+      <span class="ssel" id="cOrderSel"></span>
+      <button class="chip mini" id="cOrderEdit">edit</button>
+    </div>
+    <div id="cOrder"></div>
+  </div>
+
   <!-- what he was sent to do, and the facts of the trip: the context the
        score is given in, and the reason this screen no longer ends in half
        a page of nothing -->
@@ -711,6 +858,9 @@ window.addEventListener("error", function (e) {
     <button class="btn" id="cDelete">delete</button>
     <button class="btn primary" id="cSave">save</button>
   </div>
+  <!-- the system camera, not a custom one: it focuses and it sees in the
+       dark, and most of these photographs are taken at night -->
+  <input type="file" id="cFile" accept="image/*" capture="environment" style="display:none">
 </div>
 
 <!-- ------------------------------------------------------ D — archive -- -->
@@ -725,11 +875,18 @@ window.addEventListener("error", function (e) {
   <div class="section" style="margin-top:14px">
     <input class="field" id="dSearch" type="search" placeholder="search by name">
   </div>
+  <!-- what is still only on this device. Quiet, permanent, and never on
+       the map screen — that one gets filmed. FEATURE-MEDIA §7 -->
+  <div class="bkbar" id="dBackup">
+    <div class="txt"></div>
+    <button class="btn" id="dBackupGo">export photos</button>
+  </div>
   <div id="arclist"></div>
   <div class="footrow">
     <button class="btn" id="dAdd">add</button>
     <button class="btn" id="dJson">.json</button>
     <button class="btn" id="dCsv">.csv</button>
+    <button class="btn" id="dPhotos">photos</button>
     <button class="btn" id="dImport">import</button>
   </div>
   <input type="file" id="dFile" accept="application/json,.json" style="display:none">
@@ -768,6 +925,40 @@ window.addEventListener("error", function (e) {
   <div class="spacer"></div>
   <div class="footrow">
     <button class="btn primary" id="mSave">save</button>
+  </div>
+</div>
+
+<!-- ------------------------------------------ O — order card editor ---
+     Never opened on the iPad: the translation happens at home, on a
+     keyboard. The button that reaches this screen is hidden on a touch
+     device. FEATURE-MEDIA §2.4 -->
+<div class="screen" id="screenO">
+  <div class="hrow">
+    <div>
+      <div class="htitle">Order card</div>
+      <div class="hsub" id="oPlace"></div>
+    </div>
+    <button class="btn" id="oClose">back</button>
+  </div>
+  <div class="ascroll">
+    <div class="section">
+      <div class="slabel">dishes — three to five, never more</div>
+      <div id="oDishes"></div>
+      <button class="chip mini" id="oAdd">add a dish</button>
+    </div>
+    <div class="section ruled">
+      <div class="slabel">prices checked on</div>
+      <input class="field" id="oDate" type="date">
+      <div class="mnote">a price with no date is worse than no price.</div>
+    </div>
+    <div class="section ruled">
+      <div class="slabel">one line of advice</div>
+      <input class="field" id="oNote" type="text" placeholder="Ask for less chilli — 少辣 (shǎo là)">
+    </div>
+  </div>
+  <div class="footrow">
+    <button class="btn" id="oClear">remove the card</button>
+    <button class="btn primary" id="oSave">save the card</button>
   </div>
 </div>
 
@@ -2510,6 +2701,12 @@ function plural(n, one, many) {
   return n === 1 ? one : many;
 }
 
+/* Anything that reaches a dialog body as innerHTML goes through here first:
+   place names and error strings both contain angle brackets often enough. */
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+}
+
 /* Coordinates count up to their final value rather than appearing. Tabular
    numerals, so nothing shifts width while it counts. */
 function setCoordText(lat, lng) {
@@ -2922,6 +3119,8 @@ function openRating(record, from) {
     '  <b class="k">navigate with this</b></span>';
 
   paintTrip(record);
+  paintMedia();
+  paintOrderCard();
 
   const r = record.rating;
   draft = r
@@ -2981,18 +3180,26 @@ function saveRating() {
 function deleteRating() {
   if (!ratingTarget) return;
   const name = (ratingTarget.place && (ratingTarget.place.nameLatin || ratingTarget.place.name)) || "this place";
+  const shots = mediaFor(ratingTarget.id).length;
   dialog({
     warn: true,
     title: "Delete this rating?",
-    body: name + " goes back into the drum and the trip disappears from the catalogue. This cannot be undone.",
+    body: name + " goes back into the drum and the trip disappears from the catalogue." +
+      (shots ? " The " + shots + " " + plural(shots, "photograph", "photographs") +
+               " taken there " + (shots === 1 ? "is" : "are") + " deleted with it." : "") +
+      " This cannot be undone.",
     buttons: [
       { label: "keep it" },
       {
         label: "delete", primary: true,
         onClick: () => {
-          spins = spins.filter((r) => r !== ratingTarget);
+          const gone = ratingTarget;
+          spins = spins.filter((r) => r !== gone);
           saveSpins();
           ratingTarget = null;
+          // the rating is out of the way first: a database that refuses to
+          // delete must not leave the trip in the catalogue
+          removeMediaFor(gone.id).then(buildArchive).catch(() => {});
           refreshPool();
           buildArchive();
           showScreen("screenD");
@@ -3018,6 +3225,7 @@ function buildArchive() {
     : list;
 
   $("dCount").textContent = list.length + " " + plural(list.length, "place", "places") + " in the catalogue";
+  paintBackupBar();
   const box = $("arclist");
   box.innerHTML = "";
 
@@ -3048,7 +3256,22 @@ function buildArchive() {
     const st = document.createElement("div");
     st.className = "st" + (r.rating.stops === 0 ? " skip" : "");
     st.textContent = r.rating.stops === 0 ? "skip" : r.rating.stops + (r.rating.stops === 1 ? " stop" : " stops");
-    row.append(no, nm, st);
+    const tags = document.createElement("div");
+    tags.className = "tags";
+    const shots = mediaFor(r.id).length;
+    if (shots) {
+      const t = document.createElement("span");
+      t.className = "tag" + (hasUnexported(r) ? " hot" : "");
+      t.textContent = shots + (hasUnexported(r) ? " new" : "");
+      tags.appendChild(t);
+    }
+    if (r.orderCard && r.orderCard.dishes && r.orderCard.dishes.length) {
+      const t = document.createElement("span");
+      t.className = "tag card";
+      t.textContent = "card";
+      tags.appendChild(t);
+    }
+    row.append(no, nm, tags, st);
     row.onclick = () => openRating(r, "archive");
     box.appendChild(row);
   });
@@ -3114,14 +3337,911 @@ function rebuildWorld() {
   buildScreenA();
 }
 
+/* ============================================================== media
+   Photographs and menu scans. They live in IndexedDB, not in localStorage:
+   a data URL is a third larger than the file it wraps, localStorage caps out
+   around 5 MB, and the failure mode there is a quota exception thrown in the
+   middle of a write that also carries a rating. Ratings stay exactly where
+   they were — nothing in this section writes sh.spins except the order card,
+   which is small and has to ride along in the export. FEATURE-MEDIA §3 */
+
+const MEDIA_KINDS = [
+  // publish:false on the menu is load-bearing, not a preference: a scan is
+  // someone else's work and it ages badly. It goes to the editor and stops
+  // there. FEATURE-MEDIA §5.1
+  { id: "place", label: "the place",  publish: true,  multi: false },
+  { id: "menu",  label: "the menu",   publish: false, multi: true },
+  { id: "dish",  label: "what i ate", publish: true,  multi: false },
+];
+const KIND = new Map(MEDIA_KINDS.map((k) => [k.id, k]));
+
+const MEDIA = {
+  ok: false,           // the database opened and can be written to
+  db: null,
+  bySpin: new Map(),   // spinId -> [meta, ...] — every field except the blob
+  lastExportAt: null,
+  quota: null,         // { usage, quota, ratio }
+  persisted: false,
+  error: null,
+};
+
+const MAX_EDGE = 1600;
+const TARGET_BYTES = 500 * 1024;
+
+/* ------------------------------------------------------------ database */
+
+function openMediaDb() {
+  return new Promise((resolve, reject) => {
+    let req;
+    try {
+      req = indexedDB.open("sh-media", 1);
+    } catch (e) { reject(e); return; }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("media")) {
+        db.createObjectStore("media", { keyPath: "id" })
+          .createIndex("bySpin", "spinId", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("meta")) {
+        db.createObjectStore("meta", { keyPath: "key" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error("the database refused to open"));
+    req.onblocked = () => reject(new Error("the database is open in another tab"));
+  });
+}
+
+/* Every write resolves on the transaction's completion, never on the
+   request's success: a request can succeed inside a transaction that then
+   fails to commit, and that difference is a photograph. FEATURE-MEDIA §3.3 */
+function mediaTx(mode, storeName, fn) {
+  return new Promise((resolve, reject) => {
+    if (!MEDIA.db) { reject(new Error("photo storage is not available")); return; }
+    let tx, out;
+    try {
+      tx = MEDIA.db.transaction(storeName, mode);
+    } catch (e) { reject(e); return; }
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error || new Error("the write failed"));
+    tx.onabort = () => reject(tx.error || new Error("the write was rolled back"));
+    try {
+      fn(tx.objectStore(storeName), (v) => { out = v; });
+    } catch (e) {
+      try { tx.abort(); } catch (_) {}
+      reject(e);
+    }
+  });
+}
+
+const stripBlob = (rec) => ({
+  id: rec.id, spinId: rec.spinId, kind: rec.kind, seq: rec.seq || 1,
+  w: rec.w, h: rec.h, bytes: rec.bytes,
+  capturedAt: rec.capturedAt, publish: rec.publish, exportedAt: rec.exportedAt || null,
+});
+
+const mediaPut = (rec) => mediaTx("readwrite", "media", (s) => { s.put(rec); });
+const mediaGet = (id) => mediaTx("readonly", "media", (s, set) => {
+  const r = s.get(id);
+  r.onsuccess = () => set(r.result || null);
+});
+const mediaDrop = (id) => mediaTx("readwrite", "media", (s) => { s.delete(id); });
+const metaSet = (key, value) => mediaTx("readwrite", "meta", (s) => { s.put({ key, value }); });
+const metaGet = (key) => mediaTx("readonly", "meta", (s, set) => {
+  const r = s.get(key);
+  r.onsuccess = () => set(r.result ? r.result.value : null);
+});
+
+/* A cursor over every record. The blob it hands back is a reference to the
+   file on disk, not its bytes, so this stays cheap — but it is dropped here
+   anyway and only the description is kept in memory. */
+function mediaAllMeta() {
+  return mediaTx("readonly", "media", (s, set) => {
+    const out = [];
+    const r = s.openCursor();
+    r.onsuccess = () => {
+      const c = r.result;
+      if (!c) { set(out); return; }
+      out.push(stripBlob(c.value));
+      c.continue();
+    };
+  });
+}
+
+function indexMedia(list) {
+  MEDIA.bySpin = new Map();
+  for (const m of list) {
+    const arr = MEDIA.bySpin.get(m.spinId) || [];
+    arr.push(m);
+    MEDIA.bySpin.set(m.spinId, arr);
+  }
+  for (const arr of MEDIA.bySpin.values()) {
+    arr.sort((a, b) =>
+      String(a.capturedAt).localeCompare(String(b.capturedAt)) || (a.seq || 0) - (b.seq || 0));
+  }
+}
+
+const mediaFor = (spinId) => MEDIA.bySpin.get(spinId) || [];
+/* Always in seq order, never in capture order: capturedAt is only accurate
+   to the second and three photographs of one restaurant are taken inside
+   one, so sorting on it reshuffles the pages of a menu on the next restart —
+   and the page number is part of a file name the editor has already filed. */
+const mediaOfKind = (spinId, kind) =>
+  mediaFor(spinId).filter((m) => m.kind === kind).sort((a, b) => (a.seq || 0) - (b.seq || 0));
+const nextSeq = (spinId, kind) =>
+  mediaOfKind(spinId, kind).reduce((m, x) => Math.max(m, x.seq || 0), 0) + 1;
+const mediaCount = () => { let n = 0; for (const a of MEDIA.bySpin.values()) n += a.length; return n; };
+
+/* Storage the browser has been asked not to evict. Without this iOS may
+   throw the database away under pressure, and these files exist nowhere
+   else. Asked again on every save until it is granted. */
+async function requestPersist() {
+  if (MEDIA.persisted) return;
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    const ok = await navigator.storage.persist();
+    MEDIA.persisted = !!ok;
+    if (ok) await metaSet("persisted", true);
+  } catch (e) {}
+}
+
+async function readQuota() {
+  try {
+    if (!navigator.storage || !navigator.storage.estimate) return;
+    const est = await navigator.storage.estimate();
+    if (est && est.quota) {
+      MEDIA.quota = { usage: est.usage || 0, quota: est.quota, ratio: (est.usage || 0) / est.quota };
+    }
+  } catch (e) {}
+}
+
+async function initMedia() {
+  if (typeof indexedDB === "undefined" || !indexedDB) {
+    MEDIA.error = "this browser has no photo storage";
+    return;
+  }
+  try {
+    MEDIA.db = await openMediaDb();
+    MEDIA.ok = true;
+    indexMedia(await mediaAllMeta());
+    MEDIA.lastExportAt = await metaGet("lastExportAt");
+    MEDIA.persisted = !!(await metaGet("persisted"));
+  } catch (e) {
+    MEDIA.ok = false;
+    MEDIA.error = (e && e.message) || String(e);
+  }
+  await readQuota();
+  // the archive and the rating screen may already be open behind this
+  if ($("screenD").classList.contains("on")) buildArchive();
+  if ($("screenC").classList.contains("on") && ratingTarget) paintMedia();
+}
+
+/* --------------------------------------------------------- compression
+   Runs on the device, before anything is written, and the original is never
+   stored. Re-encoding through a canvas also drops every EXIF block, which
+   takes the GPS fix and the camera serial out of each photo before it can
+   ever be published — deliberate, not a side effect. FEATURE-MEDIA §4.2 */
+
+async function decodeBitmap(file) {
+  // createImageBitmap decodes HEIC on iOS where an <img> may refuse to, and
+  // it decodes off the main thread, which is what keeps the screen alive
+  // while a 12 MP photograph is processed.
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (e) {
+      try { return await createImageBitmap(file); } catch (e2) {}
+    }
+  }
+  return await new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("this image could not be decoded on this device"));
+    };
+    img.src = url;
+  });
+}
+
+function canvasToBlob(canvas, quality) {
+  return new Promise((resolve) => {
+    if (canvas.toBlob) {
+      canvas.toBlob((b) => resolve(b), "image/jpeg", quality);
+      return;
+    }
+    try {
+      const url = canvas.toDataURL("image/jpeg", quality);
+      const bin = atob(url.split(",")[1]);
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      resolve(new Blob([buf], { type: "image/jpeg" }));
+    } catch (e) { resolve(null); }
+  });
+}
+
+async function compressImage(file) {
+  let src = await decodeBitmap(file);
+  const sw = src.width || src.naturalWidth;
+  const sh = src.height || src.naturalHeight;
+  if (!sw || !sh) throw new Error("this image has no size");
+  const scale = Math.min(1, MAX_EDGE / Math.max(sw, sh));   // never upscale
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
+
+  // resampling an ImageBitmap happens off the main thread where the browser
+  // supports it; drawImage below does the same job on it if it does not
+  if (scale < 1 && typeof createImageBitmap === "function" && src.close) {
+    try {
+      const small = await createImageBitmap(src, {
+        resizeWidth: w, resizeHeight: h, resizeQuality: "high",
+      });
+      src.close();
+      src = small;
+    } catch (e) {}
+  }
+
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { alpha: false });
+  ctx.drawImage(src, 0, 0, w, h);
+  if (src.close) src.close();
+
+  let blob = await canvasToBlob(c, 0.75);
+  // one retry, then accept: a third pass costs seconds and saves kilobytes
+  if (blob && blob.size > TARGET_BYTES) {
+    const again = await canvasToBlob(c, 0.6);
+    if (again && again.size < blob.size) blob = again;
+  }
+  c.width = c.height = 1;   // let the backing store go straight away
+  if (!blob) throw new Error("the image could not be re-encoded");
+  return { blob, w, h };
+}
+
+/* ------------------------------------------------------------- writing */
+
+function mediaId(spinId, kind) {
+  return spinId + ":" + kind + ":" + Date.now().toString(36) +
+    Math.floor(Math.random() * 1296).toString(36);
+}
+
+async function addMedia(record, kindId, file) {
+  const k = KIND.get(kindId);
+  const img = await compressImage(file);
+  const rec = {
+    id: mediaId(record.id, kindId),
+    spinId: record.id,
+    kind: kindId,
+    // its page number, for life. Not its position in a list: deleting page 1
+    // must not silently rename page 2 to a file the editor already has.
+    seq: nextSeq(record.id, kindId),
+    blob: img.blob,
+    w: img.w, h: img.h, bytes: img.blob.size,
+    capturedAt: iso(new Date()),
+    publish: k ? k.publish : true,
+    exportedAt: null,
+  };
+  await mediaPut(rec);               // resolves only once the write commits
+  const arr = MEDIA.bySpin.get(record.id) || [];
+  arr.push(stripBlob(rec));
+  MEDIA.bySpin.set(record.id, arr);
+  requestPersist();
+  readQuota();
+  return rec;
+}
+
+async function removeMedia(meta) {
+  await mediaDrop(meta.id);
+  const arr = (MEDIA.bySpin.get(meta.spinId) || []).filter((m) => m.id !== meta.id);
+  if (arr.length) MEDIA.bySpin.set(meta.spinId, arr);
+  else MEDIA.bySpin.delete(meta.spinId);
+  dropThumb(meta.id);
+  readQuota();
+}
+
+async function removeMediaFor(spinId) {
+  for (const m of mediaFor(spinId).slice()) {
+    try { await removeMedia(m); } catch (e) {}
+  }
+}
+
+/* --------------------------------------------------------- thumbnails */
+
+const thumbs = new Map();   // media id -> object URL
+
+async function thumbUrl(id) {
+  if (thumbs.has(id)) return thumbs.get(id);
+  const rec = await mediaGet(id);
+  if (!rec || !rec.blob) return null;
+  const url = URL.createObjectURL(rec.blob);
+  thumbs.set(id, url);
+  return url;
+}
+
+/* An object URL pins its blob for as long as it exists, and he can walk the
+   archive through fifty places in a minute. Only the place on screen keeps
+   its thumbnails alive. */
+function pruneThumbs(keep) {
+  for (const id of Array.from(thumbs.keys())) if (!keep.has(id)) dropThumb(id);
+}
+
+function dropThumb(id) {
+  const url = thumbs.get(id);
+  if (url) { try { URL.revokeObjectURL(url); } catch (e) {} }
+  thumbs.delete(id);
+}
+
+function paintThumbInto(el, id) {
+  thumbUrl(id).then((url) => {
+    if (!url || !el.isConnected) return;
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+    el.insertBefore(img, el.firstChild);
+  }).catch(() => {});
+}
+
+/* -------------------------------------------------------- capture UI */
+
+let pendingKind = null;      // which slot the file picker was opened for
+let pendingReplace = null;   // the media record it is replacing, if any
+/* The camera takes the whole screen on iOS and the app is left standing for
+   as long as it takes to frame a shot. Whatever comes back belongs to the
+   place that was open when it was asked for, not to whatever is open now. */
+let pendingRecord = null;
+
+function paintMedia() {
+  const strip = $("cMedia");
+  const pages = $("cMenuPages");
+  const note = $("cMediaNote");
+  strip.innerHTML = "";
+  pages.innerHTML = "";
+  if (!ratingTarget) return;
+
+  const all = mediaFor(ratingTarget.id);
+  pruneThumbs(new Set(all.map((m) => m.id)));
+  setReadout($("cMediaOut"),
+    all.length ? all.length + '<span class="u">' + plural(all.length, "photo", "photos") + "</span>" : "");
+
+  for (const k of MEDIA_KINDS) {
+    const shots = mediaOfKind(ratingTarget.id, k.id);
+    const slot = document.createElement("button");
+    slot.className = "mslot" + (shots.length ? " has" : "") + (MEDIA.ok ? "" : " off");
+    slot.dataset.kind = k.id;
+    const lab = document.createElement("span");
+    lab.className = "lab";
+    lab.textContent = k.label;
+    if (!shots.length) {
+      const plus = document.createElement("span");
+      plus.className = "plus";
+      plus.textContent = "+";
+      slot.appendChild(plus);
+    } else {
+      paintThumbInto(slot, shots[0].id);
+      if (shots.length > 1) {
+        const cnt = document.createElement("span");
+        cnt.className = "cnt";
+        cnt.textContent = shots.length;
+        slot.appendChild(cnt);
+      }
+    }
+    slot.appendChild(lab);
+    slot.onclick = () => onSlot(k, shots);
+    strip.appendChild(slot);
+  }
+
+  // the menu's pages, managed where they are seen rather than through a
+  // dialog stacked on the slot
+  const menu = mediaOfKind(ratingTarget.id, "menu");
+  if (menu.length) {
+    menu.forEach((m, i) => {
+      const p = document.createElement("div");
+      p.className = "mpage";
+      paintThumbInto(p, m.id);
+      const b = document.createElement("b");
+      b.textContent = "p" + (i + 1);
+      p.appendChild(b);
+      p.onclick = () => offerReplaceOrRemove(KIND.get("menu"), m, i + 1);
+      pages.appendChild(p);
+    });
+  }
+
+  const bits = [];
+  if (!MEDIA.ok) bits.push("photographs cannot be stored in this browser — the score still saves." +
+    (MEDIA.error ? "<br>" + esc(MEDIA.error) : ""));
+  else if (!all.length) bits.push("optional. the score saves without any of them.");
+  if (MEDIA.ok && menu.length) bits.push("menu scans stay internal — they never reach the site.");
+  note.className = "mnote" + (MEDIA.ok ? "" : " warn");
+  note.innerHTML = bits.join("<br>");
+}
+
+function onSlot(kind, shots) {
+  if (!MEDIA.ok) {
+    dialog({
+      warn: true, title: "Photographs cannot be stored here",
+      body: "The score still saves normally. " +
+        (MEDIA.error ? "<br><br>" + esc(MEDIA.error) : ""),
+    });
+    return;
+  }
+  // a filled menu slot means "another page": the pages themselves are
+  // replaced and removed from the strip underneath, and this is the tap he
+  // makes four times in a row while the waiter waits
+  if (!shots.length || kind.multi) { pickPhoto(kind.id, null); return; }
+  offerReplaceOrRemove(kind, shots[0], 0);
+}
+
+function offerReplaceOrRemove(kind, meta, page) {
+  const what = kind.multi && page ? kind.label + ", page " + page : kind.label;
+  dialog({
+    title: what,
+    body: (meta.w && meta.h ? meta.w + " × " + meta.h + " · " : "") +
+      Math.round((meta.bytes || 0) / 1024) + " KB · taken " +
+      String(meta.capturedAt || "").slice(0, 16).replace("T", " "),
+    buttons: [
+      { label: "close" },
+      { label: "remove", onClick: () => confirmRemove(kind, meta, page) },
+      { label: "replace", primary: true, onClick: () => pickPhoto(kind.id, meta) },
+    ],
+  });
+}
+
+/* Nothing removes a photograph without a confirmation step — the same rule
+   the ratings live under, and for the same reason: it cannot be retaken. */
+function confirmRemove(kind, meta, page) {
+  dialog({
+    warn: true,
+    title: "Remove this photograph?",
+    body: (kind.multi && page ? kind.label + ", page " + page : kind.label) +
+      " is deleted from the device. It cannot be taken again.",
+    buttons: [
+      { label: "keep it" },
+      {
+        label: "remove", primary: true,
+        onClick: () => {
+          removeMedia(meta).then(() => {
+            paintMedia();
+            toast("removed");
+          }).catch((e) => {
+            dialog({ warn: true, title: "It would not delete", body: esc((e && e.message) || String(e)) });
+          });
+        },
+      },
+    ],
+  });
+}
+
+function pickPhoto(kindId, replacing) {
+  pendingKind = kindId;
+  pendingReplace = replacing || null;
+  pendingRecord = ratingTarget;
+  const input = $("cFile");
+  // several menu pages can come out of one desktop file picker; on iOS the
+  // camera hands back one shot at a time and this is ignored
+  if (KIND.get(kindId) && KIND.get(kindId).multi && !replacing) input.setAttribute("multiple", "");
+  else input.removeAttribute("multiple");
+  input.click();
+}
+
+async function onPhotoChosen(files) {
+  const kindId = pendingKind;
+  const replacing = pendingReplace;
+  const record = pendingRecord;
+  pendingKind = null;
+  pendingReplace = null;
+  pendingRecord = null;
+  if (!record || !kindId || !files.length) return;
+
+  // the strip is only worth touching if that place is still the one on screen
+  const live = ratingTarget === record;
+  const slot = live && $("cMedia").querySelector('.mslot[data-kind="' + kindId + '"]');
+  if (slot) {
+    slot.classList.add("busy");
+    const lab = slot.querySelector(".lab");
+    if (lab) lab.textContent = "working";
+  }
+
+  let done = 0;
+  for (const f of files) {
+    try {
+      await addMedia(record, kindId, f);
+      // the replacement is committed before the original goes: a failure
+      // between the two leaves two photographs, never none
+      if (replacing) { await removeMedia(replacing); }
+      done++;
+    } catch (e) {
+      if (live) paintMedia();
+      dialog({
+        warn: true,
+        title: "That photograph did not save",
+        body: "The " + ((KIND.get(kindId) || {}).label || kindId) + " was not stored — " +
+          esc((e && e.message) || String(e)) +
+          "<br><br>The rating itself is untouched. Try the shot again.",
+      });
+      return;
+    }
+  }
+  if (live) paintMedia();
+  if ($("screenD").classList.contains("on")) buildArchive();
+  toast(done + " " + plural(done, "photo", "photos") + " saved");
+}
+
+/* ---------------------------------------------------------- order card
+   Written by the editor at home and pushed back in with import, so the
+   iPad only shows it. FEATURE-MEDIA §5 */
+
+// a keyboard, a screen, and time — none of which he has at the table
+const CAN_EDIT_TEXT = (() => {
+  try { return window.matchMedia("(pointer: fine)").matches; } catch (e) { return false; }
+})();
+
+const STALE_DAYS = 240;
+
+function paintOrderCard() {
+  const box = $("cOrder");
+  const sel = $("cOrderSel");
+  box.innerHTML = "";
+  $("cOrderEdit").style.display = CAN_EDIT_TEXT ? "" : "none";
+  const card = ratingTarget && ratingTarget.orderCard;
+  if (!card || !card.dishes || !card.dishes.length) {
+    sel.textContent = "";
+    sel.className = "ssel full";
+    const e = document.createElement("div");
+    e.className = "ocnone";
+    e.textContent = CAN_EDIT_TEXT
+      ? "no card yet — three to five dishes, in characters, with a price."
+      : "no card yet. the dishes get translated at home and come back with the next import.";
+    box.appendChild(e);
+    return;
+  }
+  sel.textContent = card.dishes.length + " " + plural(card.dishes.length, "dish", "dishes");
+  sel.className = "ssel";
+
+  const wrap = document.createElement("div");
+  wrap.className = "ocard";
+  for (const d of card.dishes) {
+    const row = document.createElement("div");
+    row.className = "ocdish";
+    const add = (cls, text) => {
+      if (!text && text !== 0) return;
+      const s = document.createElement("span");
+      s.className = cls;
+      s.textContent = text;
+      row.appendChild(s);
+    };
+    add("zh", d.zh);
+    add("py", d.pinyin);
+    add("en", d.en);
+    if (typeof d.priceYuan === "number") add("pr", "¥" + d.priceYuan);
+    wrap.appendChild(row);
+  }
+  const stale = card.checkedAt &&
+    (Date.now() - Date.parse(card.checkedAt)) > STALE_DAYS * 86400000;
+  const ck = document.createElement("div");
+  ck.className = "occhecked" + (stale ? " stale" : "");
+  ck.textContent = card.checkedAt
+    ? "prices checked " + String(card.checkedAt).slice(0, 10) + (stale ? " — check them again" : "")
+    : "undated — the prices cannot be trusted";
+  if (!card.checkedAt) ck.className = "occhecked stale";
+  wrap.appendChild(ck);
+  if (card.note) {
+    const n = document.createElement("div");
+    n.className = "ocnote";
+    n.textContent = card.note;
+    wrap.appendChild(n);
+  }
+  box.appendChild(wrap);
+}
+
+const MAX_DISHES = 5;
+let cardDraft = [];
+
+function openOrderCard() {
+  if (!ratingTarget) return;
+  const p = ratingTarget.place || {};
+  $("oPlace").textContent = (p.nameLatin || p.name || "") + (p.name && p.nameLatin ? "  ·  " + p.name : "");
+  const card = ratingTarget.orderCard;
+  cardDraft = card && card.dishes && card.dishes.length
+    ? card.dishes.map((d) => ({ zh: d.zh || "", pinyin: d.pinyin || "", en: d.en || "", priceYuan: d.priceYuan }))
+    : [{ zh: "", pinyin: "", en: "", priceYuan: null },
+       { zh: "", pinyin: "", en: "", priceYuan: null },
+       { zh: "", pinyin: "", en: "", priceYuan: null }];
+  $("oDate").value = (card && card.checkedAt ? String(card.checkedAt).slice(0, 10) : todayIso());
+  $("oNote").value = (card && card.note) || "";
+  buildOrderRows();
+  showScreen("screenO");
+}
+
+function todayIso() { return iso(new Date()).slice(0, 10); }
+
+function buildOrderRows() {
+  const box = $("oDishes");
+  box.innerHTML = "";
+  cardDraft.forEach((d, i) => {
+    const row = document.createElement("div");
+    row.className = "ocrow";
+    const mk = (cls, value, ph, type) => {
+      const f = document.createElement("input");
+      f.className = "field " + cls;
+      f.type = type || "text";
+      f.value = value == null ? "" : value;
+      f.placeholder = ph;
+      return f;
+    };
+    const zh = mk("zh", d.zh, "红烧牛肉面");
+    const py = mk("py", d.pinyin, "hóngshāo niúròu miàn");
+    const en = mk("en", d.en, "braised beef noodles");
+    const pr = mk("pr", d.priceYuan, "¥", "number");
+    zh.oninput = () => { d.zh = zh.value; };
+    py.oninput = () => { d.pinyin = py.value; };
+    en.oninput = () => { d.en = en.value; };
+    pr.oninput = () => { const n = parseInt(pr.value, 10); d.priceYuan = isNaN(n) ? null : n; };
+    const x = document.createElement("button");
+    x.className = "x";
+    x.textContent = "×";
+    x.onclick = () => { cardDraft.splice(i, 1); buildOrderRows(); };
+    row.append(zh, py, en, pr, x);
+    box.appendChild(row);
+  });
+  // five is the ceiling on purpose: a wall of dishes is useless at a table
+  $("oAdd").style.display = cardDraft.length >= MAX_DISHES ? "none" : "";
+}
+
+function saveOrderCard() {
+  if (!ratingTarget) return;
+  const dishes = cardDraft
+    .map((d) => ({
+      zh: (d.zh || "").trim(),
+      pinyin: (d.pinyin || "").trim(),
+      en: (d.en || "").trim(),
+      priceYuan: typeof d.priceYuan === "number" && !isNaN(d.priceYuan) ? d.priceYuan : null,
+    }))
+    .filter((d) => d.zh || d.en)
+    .slice(0, MAX_DISHES);
+  if (!dishes.length) { toast("a card needs at least one dish"); return; }
+  const checkedAt = $("oDate").value || todayIso();
+  ratingTarget.orderCard = {
+    dishes,
+    checkedAt,
+    note: ($("oNote").value || "").trim() || null,
+  };
+  ratingTarget.updatedAt = iso(new Date());
+  saveSpins();
+  paintOrderCard();
+  showScreen("screenC");
+  toast(dishes.length + " " + plural(dishes.length, "dish", "dishes") + " on the card");
+}
+
+function clearOrderCard() {
+  if (!ratingTarget || !ratingTarget.orderCard) { showScreen("screenC"); return; }
+  dialog({
+    warn: true,
+    title: "Remove the order card?",
+    body: "The dishes and the translation go with it.",
+    buttons: [
+      { label: "keep it" },
+      {
+        label: "remove", primary: true,
+        onClick: () => {
+          delete ratingTarget.orderCard;
+          ratingTarget.updatedAt = iso(new Date());
+          saveSpins();
+          paintOrderCard();
+          showScreen("screenC");
+        },
+      },
+    ],
+  });
+}
+
 /* ========================================================= export/import
    The guide site reads places.json directly. Field names are load-bearing:
    if one has to change, bump the version. SPEC 6.4 */
-const EXPORT_VERSION = 1;
+/* 2: order cards and the media manifest joined the record. Nothing was
+   renamed — every field version 1 carried is still here and still means the
+   same thing — but the guide site sees new keys, so it is a new version.
+   SPEC 6.4 */
+const EXPORT_VERSION = 2;
 const round5 = (n) => Math.round(n * 1e5) / 1e5;
+
+/* ---------------------------------------------------- the media manifest
+   places.json names every file the photo export writes, so the editor can
+   put the two halves back together. The file names are flat — a slash in a
+   download attribute is sanitised away by the browser — and the manifest
+   says media/ because that is the folder they belong in once they land.
+   FEATURE-MEDIA §6.2 */
+
+function spinNo(record) {
+  const m = /(\d+)\s*$/.exec(record.id || "");
+  return m ? m[1].padStart(4, "0") : String(Math.abs(hashString(record.id || "")) % 10000).padStart(4, "0");
+}
+
+function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+/* Files are numbered per kind and per place, in the order they were taken,
+   so 0048-menu-2.jpg is the second page of that restaurant's menu and stays
+   that even if the first page is later replaced. */
+function manifestFor(record) {
+  const no = spinNo(record);
+  const out = [];
+  for (const k of MEDIA_KINDS) {
+    for (const m of mediaOfKind(record.id, k.id)) {
+      const file = no + "-" + m.kind + "-" + (m.seq || 1) + ".jpg";
+      out.push({
+        meta: m, name: file,
+        entry: { id: m.id, kind: m.kind, file: "media/" + file, publish: !!m.publish },
+      });
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------ backup discipline
+   Eviction is real, the photographs exist nowhere else, and the archive is
+   the only screen that is never filmed. FEATURE-MEDIA §7 */
+
+const hasUnexported = (record) => mediaFor(record.id).some((m) => !m.exportedAt);
+const unbackedRecords = () => spins.filter(hasUnexported);
+
+function paintBackupBar() {
+  const bar = $("dBackup");
+  if (!bar) return;
+  const msgs = [];
+  const un = unbackedRecords();
+  // three is the threshold: one unbacked place is this afternoon's work
+  if (un.length > 3) {
+    msgs.push(un.length + " places not backed up yet");
+  }
+  if (MEDIA.quota && MEDIA.quota.ratio > 0.8) {
+    msgs.push("storage " + Math.round(MEDIA.quota.ratio * 100) + "% full — export and clear space");
+  }
+  bar.classList.toggle("on", msgs.length > 0);
+  bar.querySelector(".txt").innerHTML = msgs.join("<br>");
+}
+
+/* ------------------------------------------------------ the photo export
+   One file at a time, with the count on screen. Thirty <a download> clicks
+   fired in a loop is the version that silently drops most of them on iOS.
+   FEATURE-MEDIA §6.2 */
+
+let queueCancelled = false;
+
+function exportMediaDialog() {
+  if (!MEDIA.ok) {
+    dialog({ warn: true, title: "No photographs on this device",
+      body: MEDIA.error ? esc(MEDIA.error) : "Photo storage is unavailable here." });
+    return;
+  }
+  const all = [];
+  for (const r of spins) for (const item of manifestFor(r)) all.push({ record: r, ...item });
+  if (!all.length) { toast("no photographs yet"); return; }
+  const fresh = all.filter((x) => !x.meta.exportedAt);
+  const since = MEDIA.lastExportAt ? String(MEDIA.lastExportAt).slice(0, 10) : "never";
+  const mb = (list) => (list.reduce((a, x) => a + (x.meta.bytes || 0), 0) / 1048576).toFixed(1);
+
+  dialog({
+    title: "Export photographs",
+    body:
+      "places.json goes first, then one image at a time. Keep the screen on until the count finishes." +
+      "<br><br>last export: " + esc(since) +
+      "<br>new since then: " + fresh.length + " (" + mb(fresh) + " MB)" +
+      "<br>everything: " + all.length + " (" + mb(all) + " MB)",
+    buttons: [
+      { label: "cancel" },
+      { label: "everything", onClick: () => runMediaQueue(all) },
+      {
+        label: "new (" + fresh.length + ")", primary: true,
+        onClick: () => {
+          if (!fresh.length) { toast("everything is already backed up"); return; }
+          runMediaQueue(fresh);
+        },
+      },
+    ],
+  });
+}
+
+async function runMediaQueue(items) {
+  queueCancelled = false;
+  const total = items.length + 1;                     // places.json counts
+  let done = 0;
+  const failed = [];
+
+  const paint = (label) => {
+    const body = $("dbody");
+    if (!body) return;
+    const pct = Math.round((done / total) * 100);
+    body.innerHTML =
+      '<div class="expq"><div class="n">' + done + " of " + total + " saved</div>" +
+      '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="fail">' + esc(label || "") + "</div></div>";
+  };
+
+  dialog({
+    title: "Saving",
+    body: "",
+    buttons: [{ label: "stop", onClick: () => { queueCancelled = true; } }],
+  });
+  paint("places.json");
+
+  // the manifest first: a folder of images no file describes is not a backup
+  if (!download("places.json", JSON.stringify(exportPayload(), null, 2), "application/json", true)) {
+    failed.push("places.json");
+  }
+  done++;
+  paint("");
+
+  for (const item of items) {
+    if (queueCancelled) break;
+    await sleepMs(420);   // Safari drops downloads fired back to back
+    paint(item.name);
+    let ok = false;
+    try {
+      const rec = await mediaGet(item.meta.id);
+      if (rec && rec.blob) ok = downloadBlob(item.name, rec.blob);
+      if (ok) {
+        rec.exportedAt = iso(new Date());
+        await mediaPut(rec);
+        item.meta.exportedAt = rec.exportedAt;
+      }
+    } catch (e) { ok = false; }
+    if (!ok) failed.push(item.name);
+    done++;
+    paint("");
+  }
+
+  MEDIA.lastExportAt = iso(new Date());
+  try { await metaSet("lastExportAt", MEDIA.lastExportAt); } catch (e) {}
+  buildArchive();
+
+  const saved = done - failed.length;
+  dialog({
+    warn: failed.length > 0,
+    title: queueCancelled ? "Stopped" : failed.length ? "Some files did not save" : "Backed up",
+    body:
+      saved + " of " + total + " saved." +
+      (failed.length
+        ? "<br><br>these did not: " + esc(failed.slice(0, 12).join(", ")) +
+          (failed.length > 12 ? " and " + (failed.length - 12) + " more" : "") +
+          "<br><br>They stay marked as new, so running the export again picks up exactly these."
+        : ""),
+    buttons: failed.length
+      ? [{ label: "later" }, { label: "try those again", primary: true, onClick: () => {
+          const retry = items.filter((x) => failed.includes(x.name));
+          if (retry.length) runMediaQueue(retry);
+        } }]
+      : [{ label: "good", primary: true }],
+  });
+}
+
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function downloadBlob(filename, blob) {
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    if (typeof a.download === "undefined") throw new Error("no download attribute");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) a.parentNode.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 8000);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 function flatPlace(r) {
   const p = r.place || {};
+  const man = manifestFor(r);
   const g = wgsToGcj(p.lat, p.lng);
   return {
     id: p.id,
@@ -3147,6 +4267,15 @@ function flatPlace(r) {
     ruleEn: r.rule ? (r.rule.en || r.rule.ru || null) : null,
     ruleZh: r.rule ? r.rule.zh : null,
     updatedAt: r.updatedAt,
+    // the card is what the guide site actually sells, and it is small, so it
+    // travels inside the record rather than alongside the photographs
+    orderCard: r.orderCard || null,
+    // publishable photographs only. A menu scan is someone else's work and
+    // must never reach the site, and the site is a repository that cannot be
+    // seen from here — so it is kept out of the list that repository reads
+    // rather than trusted to honour a flag. FEATURE-MEDIA §5.1
+    media: man.filter((x) => x.entry.publish).map((x) => x.entry),
+    mediaInternal: man.filter((x) => !x.entry.publish).map((x) => x.entry),
   };
 }
 
@@ -3159,7 +4288,7 @@ function exportPayload() {
   };
 }
 
-function download(filename, text, mime) {
+function download(filename, text, mime, quiet) {
   try {
     const blob = new Blob([text], { type: mime + ";charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -3173,8 +4302,10 @@ function download(filename, text, mime) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 4000);
-    toast("saved: " + filename);
+    if (!quiet) toast("saved: " + filename);
+    return true;
   } catch (e) {
+    if (quiet) return false;
     // Safari under file:// can refuse the download. Never lose the export:
     // put it on screen so it can be selected and sent by hand.
     dialog({
@@ -3186,6 +4317,7 @@ function download(filename, text, mime) {
         "</textarea>",
       buttons: [{ label: "close", primary: true }],
     });
+    return false;
   }
 }
 
@@ -3195,8 +4327,29 @@ function exportJson() {
   download("places.json", JSON.stringify(exportPayload(), null, 2), "application/json");
 }
 
+/* A spreadsheet has no room for the card or the manifest as structures, so
+   each flattens to a column. places.json stays the contract; this is for
+   reading. */
+function csvRow(p) {
+  const out = {};
+  for (const k of Object.keys(p)) {
+    if (k === "orderCard" || k === "media" || k === "mediaInternal") continue;
+    out[k] = p[k];
+  }
+  const c = p.orderCard;
+  out.dishes = c && c.dishes
+    ? c.dishes.map((d) =>
+        [d.zh, d.pinyin, d.en, d.priceYuan == null ? "" : "¥" + d.priceYuan]
+          .filter(Boolean).join(" ")).join(" ; ")
+    : "";
+  out.orderCheckedAt = c ? c.checkedAt || "" : "";
+  out.orderNote = c ? c.note || "" : "";
+  out.photos = (p.media || []).length + (p.mediaInternal || []).length;
+  return out;
+}
+
 function exportCsv() {
-  const rows = visitedRecords().map(flatPlace);
+  const rows = visitedRecords().map(flatPlace).map(csvRow);
   if (!rows.length) { toast("the catalogue is empty — nothing to export"); return; }
   const cols = Object.keys(rows[0]);
   const esc = (v) => {
@@ -3237,7 +4390,7 @@ function importJson(text) {
     return;
   }
 
-  let added = 0, updated = 0, skipped = 0, manualAdded = 0;
+  let added = 0, updated = 0, skipped = 0, manualAdded = 0, cards = 0;
   for (const p of places) {
     if (!p || !p.id) { skipped++; continue; }
 
@@ -3252,7 +4405,12 @@ function importJson(text) {
       manualAdded++;
     }
 
-    const existing = spins.find((r) => r.placeId === p.id);
+    // by spinId first — that is the identity the editor's file carries, and
+    // it is how a translated card finds the trip it belongs to. Falling back
+    // to placeId keeps every file written before version 2 importable.
+    const existing =
+      (p.spinId && spins.find((r) => r.id === p.spinId)) ||
+      spins.find((r) => r.placeId === p.id);
     const rating = {
       stops: p.stops, fromTheAirport: !!p.fromTheAirport,
       pricePerPerson: p.pricePerPerson, nerve: p.nerve,
@@ -3272,17 +4430,23 @@ function importJson(text) {
         distanceKm: p.distanceKm == null ? null : p.distanceKm,
         rerolls: p.rerolls || 0,
         rating,
+        orderCard: p.orderCard || null,
         visitedAt: p.visitedAt || null,
         updatedAt: p.updatedAt || iso(new Date()),
       });
+      if (p.orderCard) cards++;
       added++;
     } else if (newerThan(p.updatedAt, existing.updatedAt)) {
       existing.rating = rating;
       existing.visitedAt = p.visitedAt || existing.visitedAt;
       existing.updatedAt = p.updatedAt;
       if (p.ruleEn || p.ruleRu || p.ruleZh) existing.rule = { en: p.ruleEn || p.ruleRu || null, zh: p.ruleZh };
+      if (p.orderCard) { existing.orderCard = p.orderCard; cards++; }
       updated++;
     } else {
+      // a card where there was none is never a regression, even out of a
+      // file that is otherwise older than what is already here
+      if (p.orderCard && !existing.orderCard) { existing.orderCard = p.orderCard; cards++; }
       skipped++;
     }
   }
@@ -3294,6 +4458,7 @@ function importJson(text) {
   dialog({
     title: "Import finished",
     body: `added ${added}<br>updated ${updated}<br>unchanged ${skipped}` +
+      (cards ? `<br>order cards ${cards}` : "") +
       (manualAdded ? `<br>own places restored ${manualAdded}` : ""),
   });
 }
@@ -3527,11 +4692,27 @@ function bind() {
   // 0 is a verdict, not a distance: picking it stands the whole line down
   $("cSkip").onclick = () => { draft.stops = draft.stops === 0 ? null : 0; paintScales(); };
   $("cPrice").oninput = paintSummary;
+  $("cFile").onchange = (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";   // the same shot twice in a row still fires change
+    onPhotoChosen(files);
+  };
+  $("cOrderEdit").onclick = openOrderCard;
+  $("oClose").onclick = () => showScreen("screenC");
+  $("oSave").onclick = saveOrderCard;
+  $("oClear").onclick = clearOrderCard;
+  $("oAdd").onclick = () => {
+    if (cardDraft.length >= MAX_DISHES) return;
+    cardDraft.push({ zh: "", pinyin: "", en: "", priceYuan: null });
+    buildOrderRows();
+  };
 
   $("dSearch").oninput = buildArchive;
   $("dAdd").onclick = () => { buildManualForm(); showScreen("screenM"); };
   $("dJson").onclick = exportJson;
   $("dCsv").onclick = exportCsv;
+  $("dPhotos").onclick = exportMediaDialog;
+  $("dBackupGo").onclick = exportMediaDialog;
   $("dImport").onclick = () => $("dFile").click();
   $("dFile").onchange = (e) => {
     const f = e.target.files && e.target.files[0];
@@ -3607,6 +4788,12 @@ function showHelp() {
       "高德 and Baidu need GCJ-02 — it is on the rating screen, and differs by 300–600 m.<br>" +
       "<hr>" +
       n + " " + plural(n, "place", "places") + " in the catalogue.<br>" +
+      (MEDIA.ok
+        ? mediaCount() + " " + plural(mediaCount(), "photograph", "photographs") + " on the device" +
+          (unbackedRecords().length
+            ? ", " + unbackedRecords().length + " " + plural(unbackedRecords().length, "place", "places") + " not backed up.<br>"
+            : ", all backed up.<br>")
+        : "") +
       "the app runs fully offline.<br>" +
       (location.protocol.startsWith("http")
         ? (offlineReady
@@ -3689,6 +4876,9 @@ function init() {
   if (!store.live) {
     toast("saving is unavailable — export your ratings immediately", 8000);
   }
+  // photo storage opens in the background: nothing on the map waits for it,
+  // and the app is fully usable if it never opens at all
+  initMedia().catch(() => {});
   installOfflineCopy();
   // first run: the filter screen explains itself better than a tour does
   if (!spins.length && !filters.pos) {
