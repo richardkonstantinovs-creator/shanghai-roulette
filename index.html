@@ -126,6 +126,14 @@ html,body{
   overflow:hidden;
 }
 #rulebox.on{opacity:1;}
+/* While the deck deals, the card is cool and engraved: a holder, not the
+   answer. DESIGN §10 spends amber exactly twice a run, and a frame that is
+   already amber through two seconds of shuffling has spent the second one on
+   the decoys. The whole card turning warm on one frame *is* the lock.
+   The border alpha is ramped from JS, card by card — the choosing's reticle
+   tightening, on a card instead of a star. */
+#rulebox.dealing #ruletext{color:var(--engrave);opacity:.8;}
+#rulebox.dealing #rulezh{color:var(--engrave);opacity:.45;}
 #ruletext{
   font-family:var(--display);font-size:clamp(25px,3.2vw,38px);font-weight:700;
   letter-spacing:.01em;line-height:1.18;color:var(--nova);
@@ -1854,6 +1862,73 @@ function drawNova(t) {
   ctx.globalCompositeOperation = "source-over";
 }
 
+/* The deal, on the map. Every card the deck turns over leaves a small ring at
+   the winner's star, and the answer leaves a wide amber one — so the task
+   visibly comes out of the place it belongs to, instead of arriving from
+   nowhere over a sky that has been frozen since the nova. The sky doing
+   nothing for two seconds while the only thing moving is a line of text is
+   the whole reason the beat read as dead.
+
+   Cool while the deck deals, warm only on the answer: the card and the star
+   turn amber on the same frame, which is what makes them one event. */
+function drawTaskDeal(t) {
+  const wi = spin.winner;
+  if (wi < 0 || !spin.dealRings.length) return;
+  const px = sx(V.x[wi]), py = sy(V.y[wi]);
+
+  ctx.globalCompositeOperation = "lighter";
+
+  // the star flares as it deals, so size carries the beat as well as position
+  const last = spin.dealRings[spin.dealRings.length - 1];
+  const fresh = t - last.at;
+  if (fresh >= 0 && fresh < 300) {
+    const f = 1 - fresh / 300;
+    const r = 100 * (1 + 0.3 * f * f);
+    ctx.globalAlpha = (last.warm ? 0.55 : 0.3) * f;
+    ctx.drawImage(SPR.nova, px - r, py - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
+  }
+
+  /* The lock fires the spikes a second time. Shorter than the nova's and in
+     --nova rather than --sear, so the star ranks the two amber moments
+     correctly: this one answers the first, it does not repeat it. */
+  if (last.warm && !REDUCED) {
+    const u = clamp01((t - last.at) / 600);
+    if (u < 1) {
+      const a = (1 - u) * 0.7;
+      const len = 28 * (0.6 + 0.4 * (1 - u));
+      ctx.lineWidth = 3;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const grd = ctx.createLinearGradient(px, py, px + dx * len, py + dy * len);
+        grd.addColorStop(0, `rgba(${RGB.nova},${a.toFixed(3)})`);
+        grd.addColorStop(1, `rgba(${RGB.nova},0)`);
+        ctx.strokeStyle = grd;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + dx * len, py + dy * len);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.lineWidth = 3;
+  for (let n = spin.dealRings.length - 1; n >= 0; n--) {
+    const ring = spin.dealRings[n];
+    const life = ring.warm ? 1100 : 430;
+    const u = (t - ring.at) / life;
+    if (u >= 1) { spin.dealRings.splice(n, 1); continue; }
+    if (u < 0) continue;
+    const e = 1 - Math.pow(1 - u, 2.6);
+    const a = (ring.warm ? 0.8 : 0.32) * (1 - u) * (1 - u);
+    ctx.strokeStyle = `rgba(${ring.warm ? RGB.nova : RGB.engrave},${a.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 16 + e * (ring.warm ? 200 : 56), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+}
+
 /* Street names around the winner. Resolved once at lock, not per frame:
    the same street is a hundred separate ways in OSM and the dedupe is the
    expensive part. */
@@ -2055,6 +2130,7 @@ function frame(now) {
   drawStarField(ctx, 1, now);
   drawSelector(now);
   drawNova(now);
+  drawTaskDeal(now);
   drawStreetLabels(now);
   drawPositionMark();
   drawGrade();
@@ -2159,6 +2235,21 @@ const audio = {
     } catch (e) {}
   },
 
+  /* The bed leans in while the deck deals and settles when the answer lands.
+     Under a card that is nothing but text, the room tightening around it is
+     most of what makes the held beat before the lock read as a held beat
+     rather than as the app having stopped. */
+  bedTo(gain, ms) {
+    const ac = this.ac;
+    if (!ac || !this.bedGain || !this.on) return;
+    try {
+      const t = ac.currentTime;
+      this.bedGain.gain.cancelScheduledValues(t);
+      this.bedGain.gain.setValueAtTime(this.bedGain.gain.value, t);
+      this.bedGain.gain.linearRampToValueAtTime(gain, t + ms / 1000);
+    } catch (e) {}
+  },
+
   blip(freq, dur, type, peak) {
     const ac = this.ensure();
     if (!ac || !this.on) return;
@@ -2208,6 +2299,15 @@ const audio = {
     this.blip(300 + 430 * clamp01(u), last ? 0.16 : 0.075, "triangle", last ? 0.17 : 0.11);
   },
 
+  /* One card, dealt. Rising like the choosing blips, because it is the same
+     event happening again — a decision arriving — but an octave under them
+     and half as loud, so the ear places it as the deck rather than as a
+     second choosing. Very short: a card lands, it does not ring. */
+  deal(u) {
+    const k = clamp01(u);
+    this.blip(190 + 250 * k, 0.05, "triangle", 0.06 + 0.05 * k);
+  },
+
   nova() { this.sweep(120, 38, 500, 0.5); },        // felt more than heard
   swap() { this.sweep(180, 120, 180, 0.13); },      // the place closing, quiet
   ruleLock() { this.sweep(260, 96, 320, 0.32); },   // shorter, higher, a sibling
@@ -2231,8 +2331,17 @@ const T = {
      his to time, so that he can read the name out before asking for the task */
   SWAP_OUT: 300,      // the place closes to a line
   SWAP_GAP: 90,       // an empty frame
-  RULE_MS: 1340,      // the task cycles, decelerating, and locks
+  RULE_MS: 2110,      // the deck deals, decelerating, and the answer locks
 };
+/* The deal. The task used to shuffle for 1.34 s in a frame that was already
+   amber, in silence, at a speed nothing could be read at — which is the exact
+   failure the choosing had before §6 fixed it: too few events, too fast, and
+   the eye reads a countdown running out rather than a decision being made.
+   So it is built the same way, and for the same reason. Eight cards, the last
+   three slow enough to actually read, then a held beat with no sound at all
+   before the answer takes the frame. Nothing under 200 ms, §9.
+   Sums to RULE_MS. */
+const RULE_STEPS = [200, 200, 200, 210, 240, 280, 350, 430];
 /* The choosing beat. Three finalists were not enough to read as a decision
    when each lit exactly once: the eye saw a countdown, not a choice. So the
    light cycles the triangle several times over, decelerating, and lands on
@@ -2280,6 +2389,9 @@ const spin = {
   coordFrom: null,
   blinkOrder: [],
   lastBlinkK: -1,
+  dealCards: [],      // the decoys, drawn at the spin like everything else
+  lastDealK: -1,
+  dealRings: [],      // what the deal leaves on the map, at the winner's star
 
   aliveFraction() {
     if (this.phase === "idle" || !this.order.length) return 1;
@@ -2314,6 +2426,20 @@ const spin = {
         };
       }
       acc += BLINK_STEPS[k];
+    }
+    return null;
+  },
+
+  /* Which card of the deal is face up, measured from the moment the empty
+     frame ends. null once the deck runs out — which is the answer's cue. */
+  dealState(rel) {
+    if (REDUCED || !this.dealCards.length) return null;
+    let acc = 0;
+    for (let k = 0; k < RULE_STEPS.length; k++) {
+      if (rel < acc + RULE_STEPS[k]) {
+        return { k, u: (rel - acc) / RULE_STEPS[k], last: k === RULE_STEPS.length - 1 };
+      }
+      acc += RULE_STEPS[k];
     }
     return null;
   },
@@ -2370,6 +2496,9 @@ const spin = {
     this.ruleLockedAt = null;
     this.revealAt = null;
     this.ruleFinal = pickRule(V.cat[this.winner]);
+    this.dealCards = buildDeal(this.ruleFinal, V.cat[this.winner]);
+    this.lastDealK = -1;
+    this.dealRings = [];
     this.ruleShown = null;
     this.nextTickAt = this.t0 + T.EXTINCT_FROM;
     streetLabels = [];
@@ -2475,32 +2604,49 @@ const spin = {
       const rel2 = rel - OUT - GAP;
       if (!box.classList.contains("on")) {
         box.classList.add("on");
+        // the empty holder arrives cool, with the first card already in it
+        if (this.dealCards.length && !REDUCED) box.classList.add("dealing");
         wipeIn(box);
       }
-      if (rel2 < T.RULE_MS) {
-        if (REDUCED) {
-          if (this.ruleShown !== this.ruleFinal) showRule(this.ruleFinal);
-        } else {
-          // cycling, decelerating: the interval grows so the last few land
-          // one at a time. Nothing under 200 ms — a filmed screen strobes.
-          const u = clamp01(rel2 / T.RULE_MS);
-          const step = 200 + 420 * u * u;
-          const idx = Math.floor(rel2 / step);
-          if (this._lastRuleIdx !== idx) {
-            this._lastRuleIdx = idx;
-            showRule(D.rules[secureRandom(D.rules.length)]);
-          }
+
+      const d = this.dealState(rel2);
+      if (d) {
+        /* Hard cuts, deliberately. A card turning over is a cut, and it is
+           also what leaves the wipe unspent for the one arrival that has to
+           mean something. What carries the beat instead is everything
+           around the cut, four things at once the way the choosing does it:
+           the card, the blip, the grip of the frame, and the star. */
+        if (d.k !== this.lastDealK) {
+          this.lastDealK = d.k;
+          showRule(this.dealCards[d.k]);
+          const g = d.k / Math.max(1, RULE_STEPS.length - 1);
+          box.style.borderColor = `rgba(${RGB.engrave},${(0.20 + 0.58 * g).toFixed(3)})`;
+          audio.deal(g);
+          this.dealRings.push({ at: now, warm: false });
+          // and the last two land in the hand, ramping into the lock's 7 —
+          // the choosing does the same thing on its way into the nova's 12
+          const fromEnd = RULE_STEPS.length - 1 - d.k;
+          if (fromEnd <= 1) kickShake(4 + 2 * (1 - fromEnd), 240);
         }
-      } else {
-        showRule(this.ruleFinal);
-        this.ruleLockedAt = now;
-        this.phase = "resting";
-        audio.ruleLock();
-        kickShake(7, 340);
-        wipeIn(box);
-        setPrompt("rate it when you get back");
-        persistPending();   // now with the rule on it
+        return;
       }
+
+      /* The answer. The card goes warm, the star goes with it on the same
+         frame, and this is the only arrival in the beat that gets a wipe. */
+      showRule(this.ruleFinal);
+      box.classList.remove("dealing");
+      box.style.borderColor = "";
+      this.ruleLockedAt = now;
+      this.phase = "resting";
+      audio.ruleLock();
+      audio.bedTo(0.05, 700);
+      kickShake(7, 340);
+      wipeIn($("ruletext"));
+      wipeIn($("rulezh"));
+      flashFrame(box);
+      if (!REDUCED) this.dealRings.push({ at: now, warm: true });
+      setPrompt("rate it when you get back");
+      persistPending();   // now with the rule on it
       return;
     }
   },
@@ -2515,6 +2661,7 @@ const spin = {
     landCoords();   // nothing is left mid-count when the place walks off
     setPrompt("");
     audio.swap();
+    audio.bedTo(0.085, T.SWAP_OUT + T.SWAP_GAP + T.RULE_MS);
     return true;
   },
 
@@ -2570,14 +2717,50 @@ const spin = {
 /* A rule is drawn independently of the place — except that one that costs
    money cannot be drawn for a park, a market or a street. SPEC 3.4 */
 const NO_PAYMENT_CATEGORIES = new Set(["park", "market", "street food", "viewpoint", "lanes"]);
-function pickRule(category) {
+function legalRules(category) {
   const all = D.rules || [];
-  if (!all.length) return { en: "", zh: "" };
+  if (!all.length) return [];
   const ok = NO_PAYMENT_CATEGORIES.has(category)
     ? all.filter((r) => !r.requiresPayment)
     : all;
-  const list = ok.length ? ok : all;
+  return ok.length ? ok : all;
+}
+function pickRule(category) {
+  const list = legalRules(category);
+  if (!list.length) return { en: "", zh: "" };
   return list[secureRandom(list.length)];
+}
+
+/* The deck the deal turns over on the way to the answer. Drawn at the spin,
+   with everything else, so that asking for the task later cannot change what
+   is in it.
+
+   Three things it has to be. Never the answer — a decoy identical to the
+   task kills the reveal outright, and the eye catches the repeat. Never the
+   same card twice running — that reads as the app having stalled. And drawn
+   from the same legal pool the answer came from, so a park is never shown a
+   card it could not have been dealt: nobody watching can check it, but the
+   deck on screen is then the deck that was actually in play.
+
+   An empty deck is a normal state — a one-task overlay leaves nothing else to
+   show — and then there is no deal at all: the answer simply lands. */
+function buildDeal(final, category) {
+  const pool = legalRules(category).filter((r) => r !== final);
+  if (!pool.length) return [];
+  const cards = [];
+  let bag = [];
+  for (let k = 0; k < RULE_STEPS.length; k++) {
+    if (!bag.length) bag = shuffled(pool);
+    let r = bag.pop();
+    // the bag ran dry and reshuffled onto its own last card
+    if (r === cards[cards.length - 1] && bag.length) {
+      const alt = bag.pop();
+      bag.push(r);
+      r = alt;
+    }
+    cards.push(r);
+  }
+  return cards;
 }
 
 /* ============================================================ app state */
@@ -2688,11 +2871,14 @@ function hideResult() {
   $("result").style.clipPath = "";
   const box = $("rulebox");
   box.classList.remove("on");
+  box.classList.remove("dealing");
+  box.style.borderColor = "";
   box.style.height = "";
   $("ruletext").textContent = "";
   $("rulezh").textContent = "";
   spin.ruleShown = null;
-  spin._lastRuleIdx = -1;
+  spin.lastDealK = -1;
+  spin.dealRings = [];
 }
 
 /* The frame is measured against every rule there is and fixed at the height
@@ -2721,6 +2907,20 @@ function wipeIn(el) {
     el.animate(
       [{ clipPath: "inset(0 50% 0 50%)" }, { clipPath: "inset(0 0 0 0)" }],
       { duration: 420, easing: "cubic-bezier(.2,.9,.3,1)" }
+    );
+  } catch (e) {}
+}
+
+/* The card catches the light as the task locks: one amber bloom filling the
+   frame, gone in 420 ms. Additive light, the same thing the nova does, at the
+   size of a title card — not a glow and not a shadow, which is the pair
+   DESIGN §10 rules out. */
+function flashFrame(el) {
+  if (REDUCED || !el.animate) return;
+  try {
+    el.animate(
+      [{ backgroundColor: `rgba(${RGB.nova},0.15)` }, { backgroundColor: `rgba(${RGB.nova},0)` }],
+      { duration: 420, easing: "cubic-bezier(.4,0,1,1)" }
     );
   } catch (e) {}
 }
