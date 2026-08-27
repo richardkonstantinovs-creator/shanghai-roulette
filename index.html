@@ -109,6 +109,14 @@ html,body{
   font-family:var(--utility);font-size:clamp(15px,1.8vw,20px);font-weight:500;
   letter-spacing:.1em;color:var(--rubbing);opacity:.85;margin-top:8px;
 }
+/* The station he gets off at. The one line in the result block that is a
+   practical instruction rather than a fact about the place, so it is quieter
+   than the coordinates and sits under them. */
+.pmetro{
+  font-family:var(--utility);font-size:12px;font-weight:700;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--engrave);opacity:.72;margin-top:14px;
+}
+.pmetro .zh{font-family:var(--cjk);letter-spacing:.14em;}
 
 /* The task, in its amber frame — the second and last amber of the run.
    It is not part of the result block and never shares the screen with it:
@@ -198,6 +206,24 @@ body.hideui .corner,body.hideui #prompt{display:none;}
   color:var(--rubbing);opacity:.72;padding:12px 4px;
 }
 #count i{color:var(--engrave);opacity:.6;font-style:normal;}
+
+/* A catalogued place, recalled from the map by a long press. Dense, quiet,
+   and never on camera — this screen only exists between takes. */
+.recall{text-align:left;}
+.recallshot{margin-bottom:16px;}
+.recallshot img{width:100%;max-height:38vh;object-fit:cover;display:block;}
+.recallrow{
+  display:flex;gap:14px;align-items:baseline;
+  border-top:3px solid rgba(127,169,196,.15);padding:11px 0;
+}
+.recallrow:first-child{border-top:0;}
+.recallrow b{
+  font-family:var(--utility);font-size:10px;font-weight:700;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--engrave);opacity:.6;
+  flex:0 0 76px;
+}
+.recallrow span{font-family:var(--utility);font-size:14px;color:var(--rubbing);}
+.recallrow .zh{font-family:var(--cjk);letter-spacing:.12em;opacity:.72;}
 
 /* the live clock — a filmed spin has to carry a visible timestamp */
 #clock{
@@ -707,6 +733,7 @@ window.addEventListener("error", function (e) {
   <div class="pmeta" id="pmeta"></div>
   <div class="pcoord" id="pcoord"></div>
   <div class="pdist" id="pdist"></div>
+  <div class="pmetro" id="pmetro"></div>
 </div>
 
 <!-- the task. A sibling of the result, not a child: the result is hidden by
@@ -826,6 +853,8 @@ window.addEventListener("error", function (e) {
     </div>
     <!-- the ride itself: a line, and how far down it this place is worth -->
     <div class="stopline" id="stopsScale"></div>
+    <!-- what the ride actually was, which is not what it was worth -->
+    <div class="mnote" id="cRide"></div>
     <div class="chips" style="margin-top:16px">
       <button class="chip" id="cSkip">skip it</button>
       <button class="chip" id="cAirport">worth the trip from the airport</button>
@@ -1213,6 +1242,69 @@ const G = {
   w2: packLines((D.roads && D.roads.w2) || []),
   w3: packLines((D.roads && D.roads.w3) || []),
 };
+/* ------------------------------------------------------------------ metro
+
+   The show's unit of value is "how many stops is this worth riding", and the
+   metro was the one thing the chart did not have. Three things come out of the
+   extract: geometry to draw, stations to name, and `adj` — which stations are
+   next to each other — which is what turns "how many stops away" from a guess
+   into a measurement.
+
+   An absent `metro` key is a normal state: every data file built before this
+   existed has none, and an iPad that has not taken a new build must still
+   open. Nothing below may throw and nothing may be required. */
+const METRO = D.metro || null;
+const METRO_LINES = packLines((METRO && METRO.lines) || []);
+const METRO_STATIONS = ((METRO && METRO.stations) || []).map((r) => ({
+  lat: r[0] / 1e5, lng: r[1] / 1e5, name: r[2] || "", zh: r[3] || "",
+  x: WX(r[1] / 1e5), y: WY(r[0] / 1e5),
+}));
+/* Adjacency as a list per station, built once. The app never needs the routes
+   themselves — a hop is a hop whichever line it is on, and an interchange is
+   simply a station with more than two neighbours. */
+const METRO_ADJ = METRO_STATIONS.map(() => []);
+for (const e of (METRO && METRO.adj) || []) {
+  if (METRO_ADJ[e[0]] && METRO_ADJ[e[1]]) {
+    METRO_ADJ[e[0]].push(e[1]);
+    METRO_ADJ[e[1]].push(e[0]);
+  }
+}
+
+/* Nearest station to a point, in world coordinates, with its distance in
+   metres. Four hundred stations is a linear scan nobody will ever feel. */
+function nearestStation(lat, lng) {
+  let best = -1, bestD = Infinity;
+  for (let i = 0; i < METRO_STATIONS.length; i++) {
+    const st = METRO_STATIONS[i];
+    const d = haversineKm(lat, lng, st.lat, st.lng);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best < 0 ? null : { i: best, st: METRO_STATIONS[best], m: Math.round(bestD * 1000) };
+}
+
+/* How many stops between two stations. Breadth-first over `adj`, because on a
+   metro every edge is one stop and there is nothing to weigh. Returns null if
+   they are not connected — Chongming is on the map and not on the network. */
+function stationHops(a, b) {
+  if (a == null || b == null || a === b) return a === b ? 0 : null;
+  const seen = new Int32Array(METRO_STATIONS.length).fill(-1);
+  seen[a] = 0;
+  let frontier = [a];
+  while (frontier.length) {
+    const next = [];
+    for (const i of frontier) {
+      for (const j of METRO_ADJ[i]) {
+        if (seen[j] !== -1) continue;
+        seen[j] = seen[i] + 1;
+        if (j === b) return seen[j];
+        next.push(j);
+      }
+    }
+    frontier = next;
+  }
+  return null;
+}
+
 /* District boundaries, one pack each. They have shipped inside
    `data/shanghai.js` since the first build — the pipeline needs them to decide
    which district a venue is in — and nothing has ever drawn them. They are the
@@ -1538,6 +1630,60 @@ function drawLines(g, pack, view0, vx0, vy0, vx1, vy1, width, stroke, casing) {
   }
 }
 
+/* Builds the path only. Everything else here fills it, strokes it or clips a
+   hatch inside it, and all three want the same traversal. */
+function polyPath(g, pack, view0, vx0, vy0, vx1, vy1) {
+  const { xy, off, box, count } = pack;
+  if (!count) return false;
+  let any = false;
+  g.beginPath();
+  for (let i = 0; i < count; i++) {
+    const b = i * 4;
+    if (box[b + 2] < vx0 || box[b] > vx1 || box[b + 3] < vy0 || box[b + 1] > vy1) continue;
+    const a0 = off[i], a1 = off[i + 1];
+    if (a1 - a0 < 3) continue;
+    any = true;
+    for (let p = a0; p < a1; p++) {
+      const px = (xy[p * 2] - view0.x) * view0.s + view0.w / 2;
+      const py = (xy[p * 2 + 1] - view0.y) * view0.s + view0.h / 2;
+      if (p === a0) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+    g.closePath();
+  }
+  return any;
+}
+
+/* Engraved hatching, clipped inside a set of polygons.
+
+   This is the oldest convention on any printed chart: water carries fine
+   parallel lines, ground cover carries them at another angle, and the two
+   surfaces are told apart by *texture* rather than by tone. It is the thing
+   that makes an image read as engraved rather than as a dark-mode map, and it
+   costs one clip and a few dozen strokes at bake time.
+
+   Spacing never goes below 10 px: a filmed screen strobes on anything finer,
+   and §9 does not care that this one is beautiful. */
+function hatchPolys(g, pack, view0, vx0, vy0, vx1, vy1, style, spacing, angle) {
+  g.save();
+  if (!polyPath(g, pack, view0, vx0, vy0, vx1, vy1)) { g.restore(); return; }
+  g.clip();
+  g.lineWidth = 3;
+  g.strokeStyle = style;
+  const w = view0.w, h = view0.h;
+  const reach = Math.hypot(w, h);
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  g.beginPath();
+  for (let d = -reach; d <= reach; d += spacing) {
+    // a line through (cx,cy) + d·normal, running along (dx,dy)
+    const cx = w / 2 - dy * d, cy = h / 2 + dx * d;
+    g.moveTo(cx - dx * reach, cy - dy * reach);
+    g.lineTo(cx + dx * reach, cy + dy * reach);
+  }
+  g.stroke();
+  g.restore();
+}
+
 function fillPolys(g, pack, view0, vx0, vy0, vx1, vy1, style, shoreline) {
   const { xy, off, box, count } = pack;
   if (!count) return;
@@ -1634,14 +1780,26 @@ function bakeLayer0() {
      resolve in favour of the stars, every time. So the ladder holds at
      working zoom and tapers as the view pulls out. */
   const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
-  const roadFade = 0.38 + 0.62 * zf;
+  const roadFade = 0.32 + 0.68 * zf;
 
   drawGraticule(l0ctx, v0, vx0, vy0, vx1, vy1);
 
+  /* Contours belong to the wide view. Gone by the time street detail resolves:
+     an isoline at the scale of one block is a line through nothing. */
+  drawContours(l0ctx, v0, 0.10 * (1 - clamp01(zf / 0.45)));
+
   fillPolys(l0ctx, G.water, v0, vx0, vy0, vx1, vy1, `rgb(${RGB.abyss})`,
     `rgba(${RGB.engrave},${(0.16 * roadFade + 0.06).toFixed(3)})`);
+  /* Water hatched flat, ground cover hatched across it. The angle is the whole
+     point: two surfaces told apart by texture rather than by tone is what a
+     printed chart does, and it is the difference between engraved and
+     dark-mode. Both are spaced well clear of the 10 px floor §9 sets. */
+  hatchPolys(l0ctx, G.water, v0, vx0, vy0, vx1, vy1,
+    `rgba(${RGB.engrave},0.05)`, 12, 0);
   // Green is not a seventh colour: it is the engraved blue, barely raised.
   fillPolys(l0ctx, G.green, v0, vx0, vy0, vx1, vy1, `rgba(${RGB.engrave},0.055)`);
+  hatchPolys(l0ctx, G.green, v0, vx0, vy0, vx1, vy1,
+    `rgba(${RGB.engrave},0.06)`, 11, Math.PI / 4);
 
   /* The casing fades with the roads it separates. At a working zoom it does
      the job it exists for — a road stroked once merges into its neighbours —
@@ -1669,6 +1827,48 @@ function bakeLayer0() {
      *lives*, and a district he has worked is visible from across the room
      long before the individual stars in it are. It costs no seventh colour:
      `--rubbing` is already what catalogued means. */
+  /* The metro, over the roads and under the boundaries. It is the one network
+     on this chart that is not a street, so it does not share the road ladder:
+     it holds its weight at every zoom, and it is what a viewer recognises the
+     city by before they recognise a single road. Stations are open marks, not
+     stars — nothing on this chart is a star except a place. */
+  if (METRO_LINES.count) {
+    drawLines(l0ctx, METRO_LINES, v0, vx0, vy0, vx1, vy1, 3.0,
+      `rgba(${RGB.engrave},${(0.26 + 0.18 * zf).toFixed(3)})`,
+      `rgba(${RGB.abyss},${(0.40 + 0.50 * zf).toFixed(3)})`);
+    /* Station marks are weighed by **how many are on screen**, not by zoom.
+
+       Zoom was the wrong measure. Eighty open circles in frame bead the
+       network into a texture that competes with the stars for precisely the
+       attention §2 always resolves in the stars' favour — and eighty of them
+       is eighty whether it happens at the approach or at the result. Ten in
+       frame is a chart telling you where to get off; eighty is upholstery.
+       So they are counted first and then given a weight, which makes the
+       decision self-regulating at every scale including ones nobody has
+       looked at yet. The *line* is what carries the network when they are
+       faint, and it is enough. */
+    const inView = [];
+    for (const st of METRO_STATIONS) {
+      if (st.x < vx0 || st.x > vx1 || st.y < vy0 || st.y > vy1) continue;
+      inView.push(st);
+      if (inView.length > 400) break;
+    }
+    const sa = clamp01((zf - 0.08) / 0.24) * Math.min(1, 16 / Math.max(1, inView.length));
+    if (sa > 0.02) {
+      const r = 4 + 2.5 * zf;
+      l0ctx.lineWidth = 3;
+      l0ctx.strokeStyle = `rgba(${RGB.engrave},${(0.62 * sa).toFixed(3)})`;
+      l0ctx.beginPath();
+      for (const st of inView) {
+        const sxp = (st.x - v0.x) * v0.s + v0.w / 2;
+        const syp = (st.y - v0.y) * v0.s + v0.h / 2;
+        l0ctx.moveTo(sxp + r, syp);
+        l0ctx.arc(sxp, syp, r, 0, Math.PI * 2);
+      }
+      l0ctx.stroke();
+    }
+  }
+
   l0ctx.setLineDash([15, 10]);
   for (const d of DISTRICT_POLYS) {
     const n = DISTRICT_VISITS.get(d.name) || 0;
@@ -1761,6 +1961,131 @@ function buildConstellations() {
   LINKS = Int32Array.from(pairs);
 }
 
+/* --------------------------------------------------------------- contours
+
+   Isolines through the density of places. The additive light already says
+   where the city is dense — but it says it in *light*, and light is the one
+   register this chart already spends on the stars themselves. Contours say
+   the same thing in **line**, which is the engraving vernacular the whole
+   direction is built on, and the two reinforce rather than compete: the glow
+   is the subject, the contours are the ground it sits on.
+
+   It also gives the wide view something a scatter cannot have — topography.
+   The eye reads nested closed curves as height, and a chart of appetite with
+   height in it is worth looking at for its own sake.
+
+   Marching squares over a blurred grid, computed once at load in world
+   coordinates and stroked by the bake. Wide zoom only: an isoline at street
+   scale is a line through nothing. */
+const CONTOUR_N = 168;          // grid cells across the bbox
+const CONTOUR_LEVELS = [0.07, 0.16, 0.31, 0.54];
+let CONTOURS = [];              // [{ level, seg: Float32Array }] in world space
+
+function buildContours() {
+  CONTOURS = [];
+  if (!V.n) return;
+  const x0 = WX(BBOX[1]), x1 = WX(BBOX[3]);
+  // WY flips latitude, so the northern edge is the *smaller* y. Taking these
+  // in bbox order gives a negative cell height and a grid that never builds.
+  const y0 = WY(BBOX[2]), y1 = WY(BBOX[0]);
+  const nx = CONTOUR_N, ny = CONTOUR_N;
+  const cw = (x1 - x0) / nx, chh = (y1 - y0) / ny;
+  if (!(cw > 0) || !(chh > 0)) return;
+
+  let grid = new Float32Array(nx * ny);
+  for (let i = 0; i < V.n; i++) {
+    const gx = Math.floor((V.x[i] - x0) / cw);
+    const gy = Math.floor((V.y[i] - y0) / chh);
+    if (gx < 0 || gy < 0 || gx >= nx || gy >= ny) continue;
+    grid[gy * nx + gx] += 1;
+  }
+  // two separable box passes ≈ a gaussian, and the cheap one is the right one
+  const R = 4;
+  for (let pass = 0; pass < 2; pass++) {
+    const tmp = new Float32Array(nx * ny);
+    for (let y = 0; y < ny; y++) {
+      for (let x = 0; x < nx; x++) {
+        let sum = 0, n = 0;
+        for (let k = -R; k <= R; k++) {
+          const xx = x + k;
+          if (xx < 0 || xx >= nx) continue;
+          sum += grid[y * nx + xx]; n++;
+        }
+        tmp[y * nx + x] = sum / n;
+      }
+    }
+    for (let x = 0; x < nx; x++) {
+      for (let y = 0; y < ny; y++) {
+        let sum = 0, n = 0;
+        for (let k = -R; k <= R; k++) {
+          const yy = y + k;
+          if (yy < 0 || yy >= ny) continue;
+          sum += tmp[yy * nx + x]; n++;
+        }
+        grid[y * nx + x] = sum / n;
+      }
+    }
+  }
+
+  let max = 0;
+  for (let i = 0; i < grid.length; i++) if (grid[i] > max) max = grid[i];
+  if (max <= 0) return;
+
+  /* Marching squares, interpolated. The uninterpolated version is a staircase
+     and reads as a bug rather than as a contour. */
+  const at = (x, y) => grid[y * nx + x];
+  const px = (x) => x0 + (x + 0.5) * cw;
+  const py = (y) => y0 + (y + 0.5) * chh;
+  const lerp = (a, b, va, vb, t) => a + ((t - va) / (vb - va || 1e-9)) * (b - a);
+
+  for (const frac of CONTOUR_LEVELS) {
+    const t = frac * max;
+    const seg = [];
+    for (let y = 0; y < ny - 1; y++) {
+      for (let x = 0; x < nx - 1; x++) {
+        const v0 = at(x, y), v1 = at(x + 1, y), v2 = at(x + 1, y + 1), v3 = at(x, y + 1);
+        const c = (v0 > t ? 1 : 0) | (v1 > t ? 2 : 0) | (v2 > t ? 4 : 0) | (v3 > t ? 8 : 0);
+        if (c === 0 || c === 15) continue;
+        const top = () => [lerp(px(x), px(x + 1), v0, v1, t), py(y)];
+        const right = () => [px(x + 1), lerp(py(y), py(y + 1), v1, v2, t)];
+        const bottom = () => [lerp(px(x), px(x + 1), v3, v2, t), py(y + 1)];
+        const left = () => [px(x), lerp(py(y), py(y + 1), v0, v3, t)];
+        const push = (a, b) => { seg.push(a[0], a[1], b[0], b[1]); };
+        switch (c) {
+          case 1: case 14: push(left(), top()); break;
+          case 2: case 13: push(top(), right()); break;
+          case 3: case 12: push(left(), right()); break;
+          case 4: case 11: push(right(), bottom()); break;
+          case 6: case 9:  push(top(), bottom()); break;
+          case 7: case 8:  push(left(), bottom()); break;
+          // saddles: draw both, which is what a printed contour does
+          case 5:  push(left(), top()); push(right(), bottom()); break;
+          case 10: push(top(), right()); push(left(), bottom()); break;
+        }
+      }
+    }
+    if (seg.length) CONTOURS.push({ level: frac, seg: Float32Array.from(seg) });
+  }
+}
+
+function drawContours(g, v0, alpha) {
+  if (!CONTOURS.length || alpha <= 0.004) return;
+  g.lineWidth = 3;
+  for (let k = 0; k < CONTOURS.length; k++) {
+    const c = CONTOURS[k];
+    // the inner rings carry more ink, the way a printed contour set does
+    const a = alpha * (0.55 + 0.45 * (k / Math.max(1, CONTOURS.length - 1)));
+    g.strokeStyle = `rgba(${RGB.engrave},${a.toFixed(3)})`;
+    g.beginPath();
+    const seg = c.seg;
+    for (let i = 0; i < seg.length; i += 4) {
+      g.moveTo((seg[i] - v0.x) * v0.s + v0.w / 2, (seg[i + 1] - v0.y) * v0.s + v0.h / 2);
+      g.lineTo((seg[i + 2] - v0.x) * v0.s + v0.w / 2, (seg[i + 3] - v0.y) * v0.s + v0.h / 2);
+    }
+    g.stroke();
+  }
+}
+
 /* One label per district, anchored at the mean of that district's own venues.
    The extract carries no label anchor, and the mean of the places is the
    better centre anyway: it lands where the district is *on this chart* rather
@@ -1802,11 +2127,40 @@ function allocStarState() {
   S.outAt = new Float64Array(V.n);
   S.cand = new Uint8Array(V.n);
   S.visited = new Uint8Array(V.n);
+  S.mag = new Float32Array(V.n);
+  S.candAt = new Float64Array(V.n);
   for (let i = 0; i < V.n; i++) {
     S.phase1[i] = Math.random() * Math.PI * 2;
     S.phase2[i] = Math.random() * Math.PI * 2;
     S.outAt[i] = Infinity;
+    S.mag[i] = magnitudeOf(V.id[i]);
   }
+}
+
+/* Magnitude. Every unvisited star used to be exactly the same size and the
+   same brightness, and that is the single reason the field still read as
+   *dots* rather than as sky: a real one is mostly faint stars with a scatter
+   of bright ones, and it is that variance the eye recognises, not the points.
+
+   Drawn from a hash of the venue id, so it is stable across restarts and
+   across rebuilds, and so it means nothing. That is deliberate. Magnitude by
+   density would double-encode what the additive light already says and drive
+   the core of the city further past white; magnitude by category would rank
+   the places, which is the rating's job and not the map's. This carries no
+   information at all — it is texture, and texture is what was missing.
+
+   The fourth power is what makes the distribution right. Uniform brightness
+   scattered at random still reads as noise; a long faint tail with a few
+   bright anchors reads as a sky. */
+function magnitudeOf(id) {
+  let h = 2166136261;
+  const str = String(id);
+  for (let k = 0; k < str.length; k++) {
+    h ^= str.charCodeAt(k);
+    h = Math.imul(h, 16777619);
+  }
+  const u = ((h >>> 0) % 100000) / 100000;
+  return Math.pow(u, 4);
 }
 
 /* Two sines at incommensurate frequencies. One sine gives a rhythm the eye
@@ -1843,10 +2197,22 @@ function drawStarField(g, gs, t) {
   const alphaScale = 0.38 + 0.62 * zf;
   for (let i = 0; i < V.n; i++) {
     const isC = S.cand[i], isV = S.visited[i];
-    if (!isC && !isV) continue;
+    /* A filter used to cut stars out of the sky between one frame and the
+       next. `candAt` is stamped whenever a star crosses in or out of the
+       pool, and both directions take 320 ms — so changing a filter is now a
+       thing that happens *to the city*, which is what makes the filter screen
+       worth playing with rather than a form to fill in. */
+    let filt = 1;
+    if (!isV) {
+      const since = t - S.candAt[i];
+      if (isC) filt = clamp01(since / 320);
+      else if (since < 320) filt = 1 - clamp01(since / 320);
+      else continue;
+    }
     const px = sx(V.x[i]) * gs, py = sy(V.y[i]) * gs;
     if (px < -pad || py < -pad || px > W * gs + pad || py > H * gs + pad) continue;
 
+    const mag = S.mag[i];
     let a, sprite, size;
     if (isV) {
       // Catalogued. Warm, permanent, and quietly steady next to the others.
@@ -1854,9 +2220,9 @@ function drawStarField(g, gs, t) {
       sprite = SPR.warm;
       size = 26 * gs * sizeScale;
     } else {
-      a = breathe(i, t) * alphaScale;
+      a = breathe(i, t) * alphaScale * (0.82 + 0.45 * mag) * filt;
       sprite = SPR.cool;
-      size = 22 * gs * sizeScale;
+      size = (18 + 13 * mag) * gs * sizeScale;
       const out = S.outAt[i];
       if (out !== Infinity) {
         if (t >= out + 220) continue;                    // gone
@@ -2087,6 +2453,89 @@ function drawDistrictLabels(t) {
   ctx.textAlign = "left";
 }
 
+/* --------------------------------------------------------------- the trail
+
+   The outro used to be a pull-back and a number, and it was the same three
+   seconds every episode — which is exactly the shape of a thing people learn
+   to skip. This draws the whole catalogue instead, in the order he actually
+   filmed it, each place lighting in turn and joined to the one before it by a
+   bowed arc, and then the newest star flares on the end of the chain.
+
+   It is the same footage every time and yet never the same shot: the chain is
+   one place longer than it was last week, and visibly so. That is the reason
+   to watch to the end, and it is the reason to keep going.
+
+   Arcs bow rather than run straight — a straight line between two points on a
+   map reads as a route, which this is not. It is an order of events. */
+let trail = null;   // { at, order: [venue index], n }
+
+function buildTrail() {
+  const recs = visitedRecords()
+    .slice()
+    .sort((a, b) => String(a.visitedAt || "").localeCompare(String(b.visitedAt || "")));
+  const order = [];
+  for (const r of recs) {
+    const i = indexById.get(r.placeId);
+    if (i != null) order.push(i);
+  }
+  return order;
+}
+
+const TRAIL_MS = 2100;
+function drawTrail(t) {
+  if (!trail || !trail.order.length) return;
+  const el = t - trail.at;
+  if (el < 0) return;
+  const order = trail.order;
+  // the whole chain in TRAIL_MS however long it is: a hundred places must not
+  // take a hundred times as long as one
+  const u = REDUCED ? 1 : clamp01(el / TRAIL_MS);
+  const reach = u * order.length;
+  if (el > TRAIL_MS + 5000) { trail = null; return; }
+
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+
+  for (let k = 1; k < order.length; k++) {
+    const seg = clamp01(reach - k);
+    if (seg <= 0) break;
+    const ax = sx(V.x[order[k - 1]]), ay = sy(V.y[order[k - 1]]);
+    const bx = sx(V.x[order[k]]), by = sy(V.y[order[k]]);
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    // bow perpendicular to the chord, a fixed fraction of its length
+    const dx = bx - ax, dy = by - ay;
+    const cx = mx - dy * 0.16, cy = my + dx * 0.16;
+    // the line ages behind the head, so the newest stretch is the brightest
+    const age = clamp01(reach - k - 1);
+    ctx.strokeStyle = `rgba(${RGB.rubbing},${(0.42 - 0.22 * age).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    if (seg >= 1) {
+      ctx.quadraticCurveTo(cx, cy, bx, by);
+    } else {
+      // de Casteljau: the part of the arc that has been drawn so far
+      const p1x = ax + (cx - ax) * seg, p1y = ay + (cy - ay) * seg;
+      const p2x = cx + (bx - cx) * seg, p2y = cy + (by - cy) * seg;
+      ctx.quadraticCurveTo(p1x, p1y, p1x + (p2x - p1x) * seg, p1y + (p2y - p1y) * seg);
+    }
+    ctx.stroke();
+  }
+
+  // and the head of the chain flares as it arrives
+  const head = Math.min(order.length - 1, Math.floor(reach));
+  if (head >= 0) {
+    const f = 1 - clamp01(reach - head);
+    const i = order[head];
+    const r = 34 * (0.7 + 0.6 * f);
+    ctx.globalAlpha = 0.5 + 0.4 * f;
+    ctx.drawImage(SPR.warm, sx(V.x[i]) - r, sy(V.y[i]) - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+}
+
 /* The catalogue mark. §8 gives visited places a soft halo, and the sprite
    alone was not it — warm and cool stars differed only in hue, which a phone
    camera and a compressed upload both flatten. A ring is a different *shape*,
@@ -2246,18 +2695,35 @@ function drawStreetLabels(t) {
       latin ? ctx.measureText(latin.toUpperCase()).width / 2 : 0,
       zh ? zh.length * 8 : 0
     ) + 10;
-    const box = { x0: px - halfW, x1: px + halfW, y0: py - 13, y1: py + (zh ? 30 : 13) };
+    /* The name is lifted clear of the line it belongs to and joined back to
+       it by a leader. Sitting the name *on* the road was ambiguous the moment
+       two of them ran close together — which, near a winner, they always do,
+       because the labels are chosen by nearness to the same point. A leader
+       and a tick is what a printed chart does and it costs two strokes. */
+    const LIFT = 26;
+    const ly = py - LIFT;
+    const box = { x0: px - halfW, x1: px + halfW, y0: ly - 13, y1: ly + (zh ? 30 : 13) };
     if (placed.some((b) => b.x0 < box.x1 && b.x1 > box.x0 && b.y0 < box.y1 && b.y1 > box.y0)) continue;
     placed.push(box);
+
+    ctx.strokeStyle = `rgba(${RGB.engrave},${(a * 0.62).toFixed(3)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(px, ly + 11);
+    ctx.lineTo(px, py - 5);
+    ctx.moveTo(px - 5, py);        // the tick that marks the road itself
+    ctx.lineTo(px + 5, py);
+    ctx.stroke();
+
     ctx.fillStyle = `rgba(${RGB.engrave},${a.toFixed(3)})`;
     if (latin) {
       ctx.letterSpacing = "0.2em";
-      ctx.fillText(latin.toUpperCase(), px, py);
+      ctx.fillText(latin.toUpperCase(), px, ly);
     }
     if (zh) {
       ctx.font = '600 13px "PingFang SC", "Noto Sans CJK SC", sans-serif';
       ctx.letterSpacing = "0.14em";
-      ctx.fillText(zh, px, py + (latin ? 18 : 0));
+      ctx.fillText(zh, px, ly + (latin ? 18 : 0));
       ctx.font = '700 12px ui-monospace, "SF Mono", Menlo, monospace';
     }
   }
@@ -2396,6 +2862,7 @@ function frame(now) {
   drawSelector(now);
   drawNova(now);
   drawTaskDeal(now);
+  drawTrail(now);
   drawDistrictLabels(now);
   drawStreetLabels(now);
   drawPositionMark();
@@ -3125,8 +3592,16 @@ function refreshPool() {
   markVisited();
   if (spin.phase === "idle") resetField();
   pool = computePool();
-  S.cand.fill(0);
-  for (const i of pool) S.cand[i] = 1;
+  /* Stamp only the stars that actually crossed, so a refresh that changes
+     nothing does not restart four thousand fades. The first pass after load
+     stamps everything at t=0, which is in the past and therefore already
+     finished — the app opens with the sky up, not fading in. */
+  const now = performance.now();
+  const was = S.cand;
+  const next = new Uint8Array(V.n);
+  for (const i of pool) next[i] = 1;
+  for (let i = 0; i < V.n; i++) if (next[i] !== was[i]) S.candAt[i] = now;
+  S.cand = next;
   updateCount();
   return pool;
 }
@@ -3220,6 +3695,24 @@ function showResult(i) {
     $("pdist").textContent = "";
   }
 
+  /* The station, and — only if he has told the app where he is — how many
+     stops away it actually is. Spelled "STOPS AWAY", never "stops": the
+     rating uses the same word for something else entirely, and the whole
+     guide turns on the difference between how far a place is and how far it
+     is *worth* going. */
+  const ms = nearestStation(v.lat, v.lng);
+  if (ms && ms.m < 2500) {
+    const label = ms.st.zh
+      ? esc(ms.st.name ? ms.st.name.toUpperCase() + "  " : "") + '<span class="zh">' + esc(ms.st.zh) + "</span>"
+      : esc((ms.st.name || "").toUpperCase());
+    let line = "metro · " + label + "  ·  " + ms.m + " m";
+    const hops = metroHopsFromHere(v.lat, v.lng);
+    if (hops != null) line += "  ·  " + hops + " " + plural(hops, "stop", "stops") + " away";
+    $("pmetro").innerHTML = line;
+  } else {
+    $("pmetro").textContent = "";
+  }
+
   $("result").classList.add("on");
   wipeIn($("pname"));
   wipeIn($("pzh"));
@@ -3227,6 +3720,26 @@ function showResult(i) {
 
 function plural(n, one, many) {
   return n === 1 ? one : many;
+}
+
+/* The station that travels with a place in the export. Shape kept flat and
+   optional-safe: both consumers read what they know and ignore the rest. */
+function stationForExport(lat, lng) {
+  const st = nearestStation(lat, lng);
+  if (!st || st.m > 2500) return null;
+  return { name: st.st.name || null, nameZh: st.st.zh || null, distanceM: st.m };
+}
+
+/* Stops from where he said he is to the station nearest a place. Null unless
+   he has actually set a position and both ends are on the network — Chongming
+   is on this chart and not on the metro, and an invented number there would be
+   worse than no number. */
+function metroHopsFromHere(lat, lng) {
+  if (!filters.pos || !METRO_STATIONS.length) return null;
+  const from = nearestStation(filters.pos.lat, filters.pos.lng);
+  const to = nearestStation(lat, lng);
+  if (!from || !to || from.m > 2500 || to.m > 2500) return null;
+  return stationHops(from.i, to.i);
 }
 
 /* Anything that reaches a dialog body as innerHTML goes through here first:
@@ -3646,6 +4159,19 @@ function openRating(record, from) {
     '<span class="nav"><b class="k">GCJ-02</b>' + gcj[0].toFixed(5) + "  " + gcj[1].toFixed(5) +
     '  <b class="k">navigate with this</b></span>';
 
+  /* The measured ride, beside the judged one. These are two different
+     numbers that share a word: the scale above asks how many stops this place
+     is *worth* riding, and this line says how many it actually took. Putting
+     them next to each other is the whole point — "eight stops away and worth
+     eleven" is a review; either number alone is a statistic. It is never
+     pre-filled into the scale, because the measurement is not the verdict. */
+  const ride = [];
+  const st = nearestStation(p.lat, p.lng);
+  if (st && st.m < 2500) ride.push("nearest station " + (st.st.zh || st.st.name) + ", " + st.m + " m");
+  const hops = metroHopsFromHere(p.lat, p.lng);
+  if (hops != null) ride.push("the ride from where you were: " + hops + " " + plural(hops, "stop", "stops"));
+  $("cRide").textContent = ride.join("  ·  ");
+
   paintTrip(record);
   paintMedia();
   paintOrderCard();
@@ -3862,6 +4388,7 @@ function rebuildWorld() {
   allocStarState();
   buildConstellations();
   buildDistrictLabels();
+  buildContours();
   refreshPool();
   buildScreenA();
 }
@@ -4571,7 +5098,11 @@ function clearOrderCard() {
    renamed — every field version 1 carried is still here and still means the
    same thing — but the guide site sees new keys, so it is a new version.
    SPEC 6.4 */
-const EXPORT_VERSION = 2;
+/* 3 — the nearest metro station travels with each place. SPEC 6.4.
+   The guide rates everything in metro stops and had no way to tell a reader
+   which station to get off at; both consumers treat unknown fields as
+   optional, so an older parser reading a 3 simply does not see it. */
+const EXPORT_VERSION = 3;
 const round5 = (n) => Math.round(n * 1e5) / 1e5;
 
 /* ---------------------------------------------------- the media manifest
@@ -4793,6 +5324,11 @@ function flatPlace(r) {
     spinId: r.id,
     distanceKm: r.distanceKm,
     rerolls: r.rerolls || 0,
+    /* Resolved at export, not at the spin: the station list comes from the
+       data build, and a place rated before the metro existed in the extract
+       should still carry one now. Null when the nearest station is more than
+       2.5 km off — on Chongming there genuinely is not one. */
+    nearestStation: stationForExport(p.lat, p.lng),
     ruleEn: r.rule ? (r.rule.en || r.rule.ru || null) : null,
     ruleZh: r.rule ? r.rule.zh : null,
     updatedAt: r.updatedAt,
@@ -5061,6 +5597,70 @@ function onEnd(e) {
   g.pinch = 0;
   const dt = performance.now() - g.startT;
   if (!g.moved && dt < TAP_MS) handleTap(g.x, g.y);
+  /* A press that stayed still and outlived the tap window used to do nothing
+     at all, which makes it the one gesture on this screen with no cost: it
+     cannot spin, so opening a catalogued star on it cannot possibly interfere
+     with a take. The plain tap still spins, always. */
+  else if (!g.moved) openCatalogueAt(g.x, g.y);
+}
+
+/* The sky as a record, not a display.
+
+   Until now nothing on the map could be touched — a catalogued star was a
+   mark that said "this happened" and could not say what happened. Every one
+   of them is a real trip that cannot be repeated, and the app was holding the
+   name, the task, the score and the photographs the whole time without ever
+   offering them back.
+
+   This is the reason to open the app on an evening with no filming in it. */
+function openCatalogueAt(px, py) {
+  if (spin.phase !== "idle" || anyScreenOpen()) return;
+  let best = -1, bestD = 36 * 36;
+  for (let i = 0; i < V.n; i++) {
+    if (!S.visited[i]) continue;
+    const dx = sx(V.x[i]) - px, dy = sy(V.y[i]) - py;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  if (best < 0) return;
+  const id = V.id[best];
+  const rec = visitedRecords().find((r) => r.placeId === id);
+  if (!rec) return;
+
+  const p = rec.place || {};
+  const r = rec.rating || {};
+  const latin = p.nameLatin || (hasCJK(p.name) ? "" : p.name);
+  const rows = [];
+  if (hasCJK(p.name) && p.name !== latin) rows.push(["", esc(p.name)]);
+  rows.push(["when", esc(String(rec.visitedAt || "").slice(0, 10))]);
+  rows.push(["where", esc((CAT_LABEL.get(p.category) || p.category || "") + "  ·  " + (p.district || ""))]);
+  if (rec.rule) rows.push(["the task", esc(rec.rule.en || rec.rule.ru || "") + (rec.rule.zh ? "<br><span class='zh'>" + esc(rec.rule.zh) + "</span>" : "")]);
+  if (r.fromTheAirport) rows.push(["worth", "the trip from the airport"]);
+  else if (typeof r.stops === "number") rows.push(["worth", r.stops === 0 ? "not the ride" : r.stops + " " + plural(r.stops, "stop", "stops")]);
+  if (typeof r.nerve === "number") rows.push(["nerve", String(r.nerve) + " / 4"]);
+  if (typeof r.pricePerPerson === "number") rows.push(["price", "¥" + r.pricePerPerson]);
+
+  const shots = mediaOfKind(rec.id, "place");
+  dialog({
+    title: latin || p.name || "",
+    body:
+      '<div class="recall">' +
+      (shots.length ? '<div class="recallshot" id="recallshot"></div>' : "") +
+      rows.map(([k, v]) => '<div class="recallrow"><b>' + esc(k) + "</b><span>" + v + "</span></div>").join("") +
+      "</div>",
+    buttons: [{ label: "close" }, { label: "open in the archive", primary: true, onClick: () => openRating(rec, "archive") }],
+  });
+
+  // the photograph arrives when it arrives — the card is readable without it
+  if (shots.length) {
+    thumbUrl(shots[0].id).then((url) => {
+      const holder = $("recallshot");
+      if (!url || !holder) return;
+      const img = document.createElement("img");
+      img.src = url;
+      holder.appendChild(img);
+    }).catch(() => {});
+  }
 }
 
 function zoomAround(px, py, factor) {
@@ -5283,6 +5883,10 @@ function playOutro() {
   const o = $("outro");
   o.textContent = String(n).padStart(3, "0") + " / " + TARGET_PLACES;
   o.classList.add("on");
+  /* The chain draws first and the count lands on the end of it. The count is
+     the claim; the chain is the evidence, and the evidence has to arrive
+     first or the number is just a number. */
+  trail = { at: performance.now(), order: buildTrail() };
   clearTimeout(playOutro._t);
   playOutro._t = setTimeout(() => o.classList.remove("on"), 6000);
 }
@@ -5395,6 +5999,7 @@ function init() {
   allocStarState();
   buildConstellations();
   buildDistrictLabels();
+  buildContours();
   cityView(false);
   buildScales();
   refreshPool();
