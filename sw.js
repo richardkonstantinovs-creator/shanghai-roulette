@@ -9,12 +9,16 @@
  * Bump CACHE when the data is rebuilt, or devices will keep serving the old
  * map from their own copy.
  */
-const CACHE = "shanghai-roulette-30cd9e4c01";
+const CACHE = "shanghai-roulette-684b0da596";
 
 const ASSETS = [
   "./",
   "./index.html",
   "./data/shanghai.js",
+  /* Always here even when it is empty. The list is fixed at install and a
+     file that only started existing later would never be fetched — the app
+     would ask the network for it on a street in Shanghai and get nothing. */
+  "./data/overlay.js",
   "./manifest.webmanifest",
   "./icon-180.png",
   "./icon-192.png",
