@@ -155,7 +155,14 @@ html,body{
   font-family:var(--utility);font-size:13px;font-weight:700;letter-spacing:.42em;
   text-transform:uppercase;color:var(--engrave);opacity:.55;z-index:5;
   pointer-events:none;text-align:center;
+  /* The one line on screen that is asking for something. It breathes on the
+     same 3.4 s cycle the stars do, slowly enough not to strobe on video (§9),
+     because a static instruction is furniture and a moving one is an
+     invitation — and the whole idle state exists to be looked at until
+     somebody taps it. */
+  animation:invite 3.4s ease-in-out infinite;
 }
+@keyframes invite{0%,100%{opacity:.40}50%{opacity:.72}}
 
 /* --------------------------------------------------------- corner controls
    Everything tappable lives in a corner, because the corners fall outside
@@ -180,6 +187,17 @@ body.hideui .corner,body.hideui #prompt{display:none;}
 .btn.warm{color:var(--rubbing);}
 .btn.wide{width:100%;}
 .btn[disabled]{opacity:.32;}
+
+/* The catalogue, in the corner outside the crop — so it is for him, every
+   time he opens the app, and never for the video, which has the outro for it.
+   It is the whole reason to open this on a day with no filming in it: a
+   number that only goes up, next to a sky that only fills up. `--rubbing`,
+   because that is what catalogued means everywhere else on this chart. */
+#count{
+  font-family:var(--utility);font-size:11px;font-weight:700;letter-spacing:.2em;
+  color:var(--rubbing);opacity:.72;padding:12px 4px;
+}
+#count i{color:var(--engrave);opacity:.6;font-style:normal;}
 
 /* the live clock — a filmed spin has to carry a visible timestamp */
 #clock{
@@ -707,6 +725,7 @@ window.addEventListener("error", function (e) {
   <button class="btn" id="bArchive">archive</button>
 </div>
 <div class="corner tr">
+  <span id="count">000<i> / 500</i></span>
   <span id="clock">--:--:--</span>
   <button class="btn" id="bHelp">?</button>
 </div>
@@ -1194,6 +1213,24 @@ const G = {
   w2: packLines((D.roads && D.roads.w2) || []),
   w3: packLines((D.roads && D.roads.w3) || []),
 };
+/* District boundaries, one pack each. They have shipped inside
+   `data/shanghai.js` since the first build — the pipeline needs them to decide
+   which district a venue is in — and nothing has ever drawn them. They are the
+   only real cartography in the extract and they are precisely the vernacular
+   §1 asks for: engraved line, thin, joining the figures. Roads are texture and
+   stars are the subject; without these the chart had no structure between the
+   two, which is why the idle state read as four thousand points on nothing.
+
+   Kept per district rather than flattened, because the ground inside each one
+   is tinted by how much of it has been catalogued. */
+const DISTRICT_POLYS = (D.districts || [])
+  .map((d) => ({ name: d.name, pack: packLines(d.rings || []) }))
+  .filter((d) => d.pack.count);
+
+/* How many catalogued places each district holds. Rebuilt with the visited
+   set, not per frame — it is only read when layer 0 bakes. */
+const DISTRICT_VISITS = new Map();
+
 const ROAD_NAMES = D.roadNames || [];
 const ROAD_NAME_IDX = D.roadNameIdx || { n1: [], n2: [] };
 
@@ -1275,6 +1312,7 @@ const blctx = bl.getContext("2d", { alpha: true });
 
 let grainPattern = null;
 let vignette = null;
+let edgeFade = null;
 
 function makeStarSprite(rgb, size) {
   const c = document.createElement("canvas");
@@ -1344,8 +1382,20 @@ function resize() {
   const gx = W / 2, gy = H / 2;
   vignette = ctx.createRadialGradient(gx, gy, 0, gx, gy, Math.hypot(W, H) / 2);
   vignette.addColorStop(0, `rgba(${RGB.abyss},0)`);
-  vignette.addColorStop(0.55, `rgba(${RGB.abyss},0.16)`);
-  vignette.addColorStop(1, `rgba(${RGB.abyss},0.55)`);
+  vignette.addColorStop(0.42, `rgba(${RGB.abyss},0.09)`);
+  vignette.addColorStop(0.78, `rgba(${RGB.abyss},0.38)`);
+  vignette.addColorStop(1, `rgba(${RGB.abyss},0.62)`);
+
+  /* The radial alone cannot compose the filmed frame: the crop is a full-height
+     9:16 slice, so its corners are the screen's top and bottom edges, where a
+     circular vignette has barely started. This second pass darkens those two
+     edges only. The eye goes to the brightest part of an image, and this is
+     what puts the brightest part where the name lands. */
+  edgeFade = ctx.createLinearGradient(0, 0, 0, H);
+  edgeFade.addColorStop(0, `rgba(${RGB.abyss},0.30)`);
+  edgeFade.addColorStop(0.13, `rgba(${RGB.abyss},0)`);
+  edgeFade.addColorStop(0.87, `rgba(${RGB.abyss},0)`);
+  edgeFade.addColorStop(1, `rgba(${RGB.abyss},0.30)`);
 
   if (!grainPattern) makeGrain();
 }
@@ -1467,7 +1517,7 @@ function drawLines(g, pack, view0, vx0, vy0, vx1, vy1, width, stroke, casing) {
   if (!count) return;
   const scale = view0.s;
   // casing first, then fill: a road stroked once merges into its neighbours.
-  const passes = casing ? [[width + 3, `rgba(${RGB.abyss},1)`], [width, stroke]] : [[width, stroke]];
+  const passes = casing ? [[width + 3, casing], [width, stroke]] : [[width, stroke]];
   for (const [lw, style] of passes) {
     g.lineWidth = lw;
     g.strokeStyle = style;
@@ -1488,7 +1538,7 @@ function drawLines(g, pack, view0, vx0, vy0, vx1, vy1, width, stroke, casing) {
   }
 }
 
-function fillPolys(g, pack, view0, vx0, vy0, vx1, vy1, style) {
+function fillPolys(g, pack, view0, vx0, vy0, vx1, vy1, style, shoreline) {
   const { xy, off, box, count } = pack;
   if (!count) return;
   g.fillStyle = style;
@@ -1507,6 +1557,59 @@ function fillPolys(g, pack, view0, vx0, vy0, vx1, vy1, style) {
     g.closePath();
   }
   g.fill();
+  /* An engraved shoreline. `--abyss` on `--ink` is barely two values apart, so
+     filled water reads as a hole in the chart rather than as something drawn —
+     the Huangpu, the one landmark every viewer can name, was the least visible
+     thing on screen. One stroke on the same path is all it takes to put it
+     back in the same hand as the roads. */
+  if (shoreline) {
+    g.lineWidth = 3;
+    g.strokeStyle = shoreline;
+    g.stroke();
+  }
+}
+
+/* The graticule. A celestial atlas has a coordinate grid — the Suzhou chart
+   has its meridians and its concentric circles — and it is half of what makes
+   an image read as a *chart* rather than as a map with the labels turned off.
+   It also does one thing no other layer can: it is the only element on screen
+   whose spacing is fixed in the world, so it is what tells the eye how far the
+   approach actually travelled. Zooming into a district with nothing in it
+   used to change nothing on screen at all.
+
+   Every fifth line carries more ink, the way a printed grid does. It carries
+   no numbers: the annotation on this chart is the district names, and the one
+   set of coordinates that matters is counted out under the winner's name.
+   DESIGN.md §1, §4.5. */
+const GRAT = [1, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01, 0.005, 0.0025, 0.001];
+function graticuleStep(span) {
+  for (const s of GRAT) if (span / s >= 5) return s;
+  return GRAT[GRAT.length - 1];
+}
+function drawGraticule(g, v0, vx0, vy0, vx1, vy1) {
+  const latB = INV_LAT(vy1), latT = INV_LAT(vy0);
+  const lngL = INV_LNG(vx0), lngR = INV_LNG(vx1);
+  const step = graticuleStep(Math.max(latT - latB, lngR - lngL));
+  const px = (wx) => (wx - v0.x) * v0.s + v0.w / 2;
+  const py = (wy) => (wy - v0.y) * v0.s + v0.h / 2;
+  g.lineWidth = 3;
+  // stepped in integer multiples, never accumulated: a float that has been
+  // added up twelve times no longer lands on the fifth line
+  for (const [alpha, wantMajor] of [[0.030, false], [0.105, true]]) {
+    g.strokeStyle = `rgba(${RGB.engrave},${alpha})`;
+    g.beginPath();
+    for (let k = Math.ceil(latB / step); k * step <= latT; k++) {
+      if ((k % 5 === 0) !== wantMajor) continue;
+      const y = py(WY(k * step));
+      g.moveTo(0, y); g.lineTo(v0.w, y);
+    }
+    for (let k = Math.ceil(lngL / step); k * step <= lngR; k++) {
+      if ((k % 5 === 0) !== wantMajor) continue;
+      const x = px(WX(k * step));
+      g.moveTo(x, 0); g.lineTo(x, v0.h);
+    }
+    g.stroke();
+  }
 }
 
 /* Bake the static chart. Called on settle and on zoom steps, never per frame. */
@@ -1531,16 +1634,52 @@ function bakeLayer0() {
      resolve in favour of the stars, every time. So the ladder holds at
      working zoom and tapers as the view pulls out. */
   const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
-  const roadFade = 0.52 + 0.48 * zf;
+  const roadFade = 0.38 + 0.62 * zf;
 
-  fillPolys(l0ctx, G.water, v0, vx0, vy0, vx1, vy1, `rgb(${RGB.abyss})`);
+  drawGraticule(l0ctx, v0, vx0, vy0, vx1, vy1);
+
+  fillPolys(l0ctx, G.water, v0, vx0, vy0, vx1, vy1, `rgb(${RGB.abyss})`,
+    `rgba(${RGB.engrave},${(0.16 * roadFade + 0.06).toFixed(3)})`);
   // Green is not a seventh colour: it is the engraved blue, barely raised.
   fillPolys(l0ctx, G.green, v0, vx0, vy0, vx1, vy1, `rgba(${RGB.engrave},0.055)`);
 
+  /* The casing fades with the roads it separates. At a working zoom it does
+     the job it exists for — a road stroked once merges into its neighbours —
+     but with fourteen thousand of them on screen the casings merge into each
+     other instead, and the whole network lifts off the chart as a ribbon of
+     relief that outshouts the stars. §2 resolves that competition in favour
+     of the stars every time, so at the city fit the roads flatten to line. */
   const ink = (base) => `rgba(${RGB.engrave},${(base * roadFade).toFixed(3)})`;
-  if (view.s > LOD_W3) drawLines(l0ctx, G.w3, v0, vx0, vy0, vx1, vy1, 3.0, ink(0.09), true);
-  if (view.s > LOD_W2) drawLines(l0ctx, G.w2, v0, vx0, vy0, vx1, vy1, 3.0, ink(0.17), true);
-  drawLines(l0ctx, G.w1, v0, vx0, vy0, vx1, vy1, 3.5, ink(0.30), true);
+  const casing = `rgba(${RGB.abyss},${(0.30 + 0.70 * zf).toFixed(3)})`;
+  if (view.s > LOD_W3) drawLines(l0ctx, G.w3, v0, vx0, vy0, vx1, vy1, 3.0, ink(0.09), casing);
+  if (view.s > LOD_W2) drawLines(l0ctx, G.w2, v0, vx0, vy0, vx1, vy1, 3.0, ink(0.17), casing);
+  drawLines(l0ctx, G.w1, v0, vx0, vy0, vx1, vy1, 3.5, ink(0.30), casing);
+
+  /* Boundaries last, over the roads, and dashed. Dashed because an unbroken
+     engraved line at this weight is read as a road, and this is the one line
+     on the chart that is not a thing you can walk down. Unlike the roads it
+     does *not* taper as the view pulls out: at the city fit it is the only
+     structure holding four thousand points together, which is exactly when it
+     is needed most.
+
+     The ground inside each district warms with the number of places
+     catalogued in it. On a new device every one of them is zero and the chart
+     looks exactly as it did — the tone only exists because he made it, which
+     is the point of it. Points say where he has been; tone says where he
+     *lives*, and a district he has worked is visible from across the room
+     long before the individual stars in it are. It costs no seventh colour:
+     `--rubbing` is already what catalogued means. */
+  l0ctx.setLineDash([15, 10]);
+  for (const d of DISTRICT_POLYS) {
+    const n = DISTRICT_VISITS.get(d.name) || 0;
+    if (n) {
+      const tint = 0.012 + 0.048 * clamp01(n / 12);
+      fillPolys(l0ctx, d.pack, v0, vx0, vy0, vx1, vy1, `rgba(${RGB.rubbing},${tint.toFixed(3)})`);
+    }
+    drawLines(l0ctx, d.pack, v0, vx0, vy0, vx1, vy1, 3.0,
+      `rgba(${RGB.engrave},${(0.26 - 0.08 * zf).toFixed(3)})`, null);
+  }
+  l0ctx.setLineDash([]);
 
   l0view.x = view.x; l0view.y = view.y; l0view.s = view.s;
   l0view.w = cw; l0view.h = ch;
@@ -1622,6 +1761,31 @@ function buildConstellations() {
   LINKS = Int32Array.from(pairs);
 }
 
+/* One label per district, anchored at the mean of that district's own venues.
+   The extract carries no label anchor, and the mean of the places is the
+   better centre anyway: it lands where the district is *on this chart* rather
+   than where its administrative middle is — which, for the river districts,
+   is water. */
+const DISTRICT_LABELS = [];
+function buildDistrictLabels() {
+  const acc = new Map();
+  for (let i = 0; i < V.n; i++) {
+    const d = V.dist[i];
+    if (!d) continue;
+    let a = acc.get(d);
+    if (!a) acc.set(d, (a = { x: 0, y: 0, n: 0 }));
+    a.x += V.x[i]; a.y += V.y[i]; a.n++;
+  }
+  const zh = new Map(DISTRICTS.map((d) => [d.name, d.nameZh]));
+  DISTRICT_LABELS.length = 0;
+  for (const [name, a] of acc) {
+    if (a.n < 5) continue;      // too few places on the chart to be worth naming
+    DISTRICT_LABELS.push({ name, zh: zh.get(name) || "", x: a.x / a.n, y: a.y / a.n, n: a.n });
+  }
+  // busiest first, so the district with the most to say wins any collision
+  DISTRICT_LABELS.sort((p, q) => q.n - p.n);
+}
+
 /* --------------------------------------------------------- star state */
 
 const S = {
@@ -1675,8 +1839,8 @@ function drawStarField(g, gs, t) {
      the view pulls out. The density gradient survives, the core stops
      clipping, and points stay countable. */
   const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
-  const sizeScale = 0.42 + 0.58 * zf;
-  const alphaScale = 0.46 + 0.54 * zf;
+  const sizeScale = 0.38 + 0.62 * zf;
+  const alphaScale = 0.38 + 0.62 * zf;
   for (let i = 0; i < V.n; i++) {
     const isC = S.cand[i], isV = S.visited[i];
     if (!isC && !isV) continue;
@@ -1737,7 +1901,16 @@ function drawStarField(g, gs, t) {
 function drawConstellations(t) {
   if (!LINKS.length) return;
   const aliveFrac = spin.aliveFraction();
-  const base = 0.07 + (0.35 - 0.07) * (1 - aliveFrac);
+  /* §2 puts these at 0.07, and that is right at a working zoom, where the
+     roads it was weighed against are at full ladder. At the city fit the
+     roads taper by `roadFade` and there are fourteen thousand of them, and a
+     0.07 line disappears into that completely — the signature the whole
+     direction rests on was invisible in exactly the state that has to be
+     worth looking at. So the ladder holds where it was calibrated and lifts
+     as the view pulls out, which is the same argument the road taper makes,
+     run the other way. */
+  const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
+  const base = (0.07 + (0.35 - 0.07) * (1 - aliveFrac)) * (1 + 0.65 * (1 - zf));
 
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -1862,6 +2035,84 @@ function drawNova(t) {
   ctx.globalCompositeOperation = "source-over";
 }
 
+/* District names, at the wide view only.
+
+   §1 asks for dense annotation, and a chart of four thousand unlabelled points
+   is a chart of nowhere — the idle state has to be worth looking at with
+   nothing happening, and a viewer who cannot tell Jing'an from Pudong has
+   nothing to look *at*. They also give the extinction somewhere to start:
+   the annotation walks down the scales across one run, districts while the
+   whole city is on screen, nothing at all while the choice is being made, and
+   street names at the winner. Three scales, never two of them at once. */
+function drawDistrictLabels(t) {
+  if (!DISTRICT_LABELS.length) return;
+  const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
+  // gone by a third of the way in from the city fit, where street-scale
+  // detail starts resolving and a district name is no longer the right scale
+  let a = (1 - clamp01(zf / 0.34)) * 0.52;
+  // and burnt off by the extinction — they must not still be here when the
+  // survivors are being chosen
+  if (spin.phase !== "idle") a *= 1 - clamp01((t - spin.t0 - 150) / 900);
+  if (a <= 0.012) return;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const placed = [];
+  for (const d of DISTRICT_LABELS) {
+    const px = sx(d.x), py = sy(d.y);
+    if (px < 40 || px > W - 40 || py < 46 || py > H - 46) continue;
+    // the prompt owns the foot of the crop and is the one thing that must
+    // always be readable — nothing shares its line
+    if (py > H * 0.82 && py < H * 0.90) continue;
+    ctx.font = '700 11px ui-monospace, "SF Mono", Menlo, monospace';
+    ctx.letterSpacing = "0.34em";
+    // measured once and kept: the font never changes, and fifteen measureText
+    // calls a frame for the whole of a long idle is an iPad tax for nothing
+    if (d.w == null) d.w = ctx.measureText(d.name.toUpperCase()).width;
+    const halfW = Math.max(d.w, d.zh.length * 15) / 2 + 16;
+    const box = { x0: px - halfW, x1: px + halfW, y0: py - 16, y1: py + (d.zh ? 24 : 16) };
+    if (placed.some((b) => b.x0 < box.x1 && b.x1 > box.x0 && b.y0 < box.y1 && b.y1 > box.y0)) continue;
+    placed.push(box);
+
+    ctx.fillStyle = `rgba(${RGB.engrave},${a.toFixed(3)})`;
+    ctx.fillText(d.name.toUpperCase(), px, py);
+    if (d.zh) {
+      ctx.font = '600 12px "PingFang SC", "Noto Sans CJK SC", sans-serif';
+      ctx.letterSpacing = "0.2em";
+      ctx.fillStyle = `rgba(${RGB.engrave},${(a * 0.62).toFixed(3)})`;
+      ctx.fillText(d.zh, px, py + 16);
+    }
+  }
+  ctx.letterSpacing = "0px";
+  ctx.textAlign = "left";
+}
+
+/* The catalogue mark. §8 gives visited places a soft halo, and the sprite
+   alone was not it — warm and cool stars differed only in hue, which a phone
+   camera and a compressed upload both flatten. A ring is a different *shape*,
+   and shape is the one channel neither of those can take away.
+
+   It is also the reason to open the app on a day with no filming in it: the
+   rings accumulate across the city, they never come off, and the sky filling
+   up is the whole reward the catalogue offers. Drawn flat, not additively, so
+   it stays a drawn mark rather than another glow. */
+function drawCatalogueMarks(t) {
+  if (!S.visited) return;
+  const zf = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
+  const r = 9 + 7 * zf;
+  ctx.lineWidth = 3;
+  for (let i = 0; i < V.n; i++) {
+    if (!S.visited[i]) continue;
+    const px = sx(V.x[i]), py = sy(V.y[i]);
+    if (px < -r || py < -r || px > W + r || py > H + r) continue;
+    const a = (0.30 + 0.10 * Math.sin(t * 0.00071 + S.phase1[i])) * depthFade(px, py);
+    ctx.strokeStyle = `rgba(${RGB.rubbing},${a.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 /* The deal, on the map. Every card the deck turns over leaves a small ring at
    the winner's star, and the answer leaves a wide amber one — so the task
    visibly comes out of the place it belongs to, instead of arriving from
@@ -1973,6 +2224,8 @@ function drawStreetLabels(t) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const gutter = (W - CROP) / 2;
+  const wi = spin.winner;
+  const wx = wi >= 0 ? sx(V.x[wi]) : null, wy = wi >= 0 ? sy(V.y[wi]) : 0;
   // Streets converge, so their nearest points to the winner do too. Labels
   // are already sorted nearest-first, so the closest street wins the space
   // and any later one that would collide with it is simply dropped.
@@ -1982,6 +2235,10 @@ function drawStreetLabels(t) {
     if (px < 24 || px > W - 24 || py < 24 || py > H - 24) continue;
     // never behind the result block, which owns the centre of the crop
     if (px > gutter - 40 && px < W - gutter + 40 && py > H * 0.29 && py < H * 0.82) continue;
+    // and never across the nova. It is the brightest thing on the chart and
+    // a name laid over it loses both — the star stops reading as a point and
+    // the street stops reading at all.
+    if (wx != null && Math.hypot(px - wx, py - wy) < 78) continue;
     const parts = s.label.split("|");
     const latin = parts[0], zh = parts[1];
 
@@ -2077,10 +2334,12 @@ function drawGrade() {
   ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = edgeFade;
+  ctx.fillRect(0, 0, W, H);
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0); // grain in device pixels, never scaled
-  ctx.globalAlpha = 0.035;
+  ctx.globalAlpha = 0.042;
   ctx.fillStyle = grainPattern;
   ctx.translate((Math.random() * 128) | 0, (Math.random() * 128) | 0);
   ctx.fillRect(-128, -128, cv.width + 256, cv.height + 256);
@@ -2121,16 +2380,23 @@ function frame(now) {
   blctx.clearRect(0, 0, bl.width, bl.height);
   blctx.setTransform((DPR / BLOOM_DIV), 0, 0, (DPR / BLOOM_DIV), 0, 0);
   drawStarField(blctx, 1, now);
-  ctx.globalAlpha = 0.5;
+  /* The bloom tapers with the view too. Additive light over four thousand
+     stacked stars clips the core of the city to a featureless white blob at
+     the city fit, and the density gradient §10 asks for is only readable if
+     the brightest part of it still has points in it. */
+  const zf0 = clamp01(Math.log(Math.max(1, view.s / cityFitScale())) / Math.log(24));
+  ctx.globalAlpha = 0.30 + 0.20 * zf0;
   ctx.globalCompositeOperation = "lighter";
   ctx.drawImage(bl, 0, 0, W, H);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
 
   drawStarField(ctx, 1, now);
+  drawCatalogueMarks(now);
   drawSelector(now);
   drawNova(now);
   drawTaskDeal(now);
+  drawDistrictLabels(now);
   drawStreetLabels(now);
   drawPositionMark();
   drawGrade();
@@ -2818,10 +3084,17 @@ function reindex() {
    time they change, so an edit or a delete is reflected immediately. */
 function markVisited() {
   S.visited.fill(0);
+  DISTRICT_VISITS.clear();
   for (const r of visitedRecords()) {
     const i = indexById.get(r.placeId);
-    if (i != null) S.visited[i] = 1;
+    if (i == null) continue;
+    S.visited[i] = 1;
+    const d = V.dist[i];
+    if (d) DISTRICT_VISITS.set(d, (DISTRICT_VISITS.get(d) || 0) + 1);
   }
+  // the tint is baked into layer 0, so a new rating has to invalidate it or
+  // the district he just came back from stays cold until the next zoom
+  l0view.valid = false;
 }
 
 let pool = [];
@@ -3588,6 +3861,7 @@ function rebuildWorld() {
   reindex();
   allocStarState();
   buildConstellations();
+  buildDistrictLabels();
   refreshPool();
   buildScreenA();
 }
@@ -5104,6 +5378,13 @@ function tickClock() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, "0");
   $("clock").textContent = p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  // carried by the clock rather than by every path that can add a rating:
+  // one place to be wrong instead of six, and a second late is not wrong
+  const n = String(visitedRecords().length).padStart(3, "0");
+  const c = $("count");
+  if (c.firstChild.nodeValue !== n) c.firstChild.nodeValue = n;
+  const goal = " / " + TARGET_PLACES;
+  if (c.lastChild.textContent !== goal) c.lastChild.textContent = goal;
 }
 
 /* ---------------------------------------------------------------- init */
@@ -5113,6 +5394,7 @@ function init() {
   reindex();
   allocStarState();
   buildConstellations();
+  buildDistrictLabels();
   cityView(false);
   buildScales();
   refreshPool();
